@@ -3,6 +3,18 @@ const API_BASE = 'http://localhost:5000/api';
 let allPlayers = [];
 let selectedPlayers = [];
 
+// DADOS DE EXEMPLO (quando API não está disponível)
+const DEMO_PLAYERS = [
+    { name: "Johnny Walker", K: 25, D: 10, A: 8, ADR: 120.5, KDR: 2.5, KAST: 82, S: 15, FA: 4, MK: 6, FK: 5, RP: 25, DROP: 0, score: 85.2, stars: 3 },
+    { name: "Lúcida", K: 20, D: 12, A: 7, ADR: 95.3, KDR: 1.67, KAST: 75, S: 12, FA: 3, MK: 4, FK: 3, RP: 18, DROP: 1, score: 72.1, stars: 2 },
+    { name: "Phoenix", K: 18, D: 14, A: 6, ADR: 88.2, KDR: 1.29, KAST: 70, S: 10, FA: 2, MK: 3, FK: 2, RP: 15, DROP: 0, score: 65.4, stars: 2 },
+    { name: "Apex", K: 22, D: 11, A: 9, ADR: 105.1, KDR: 2.0, KAST: 78, S: 13, FA: 5, MK: 5, FK: 4, RP: 21, DROP: 0, score: 78.9, stars: 3 },
+    { name: "Ghost", K: 16, D: 16, A: 5, ADR: 75.4, KDR: 1.0, KAST: 65, S: 9, FA: 1, MK: 2, FK: 1, RP: 12, DROP: 2, score: 55.3, stars: 1 },
+    { name: "Shadow", K: 19, D: 13, A: 8, ADR: 92.7, KDR: 1.46, KAST: 72, S: 11, FA: 3, MK: 3, FK: 3, RP: 16, DROP: 1, score: 68.5, stars: 2 },
+    { name: "Nova", K: 23, D: 9, A: 10, ADR: 115.2, KDR: 2.56, KAST: 85, S: 14, FA: 6, MK: 5, FK: 6, RP: 24, DROP: 0, score: 82.1, stars: 3 },
+    { name: "Titan", K: 14, D: 18, A: 4, ADR: 68.9, KDR: 0.78, KAST: 60, S: 8, FA: 1, MK: 1, FK: 1, RP: 10, DROP: 3, score: 48.2, stars: 1 },
+];
+
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     loadInitialData();
@@ -48,9 +60,12 @@ async function loadInitialData() {
         const data = await response.json();
         if (data.success) {
             allPlayers = data.data || [];
+        } else {
+            allPlayers = DEMO_PLAYERS;
         }
     } catch (error) {
-        console.error('Erro:', error);
+        console.error('API indisponível, usando dados de exemplo');
+        allPlayers = DEMO_PLAYERS;
     }
 }
 
