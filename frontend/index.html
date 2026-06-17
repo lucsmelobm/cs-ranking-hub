@@ -4,91 +4,140 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CS Ranking Hub - Ranking & Team Builder</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="stars-bg"></div>
+
     <div class="container">
-        <header>
+        <!-- Header -->
+        <header class="header">
             <div class="header-content">
-                <h1>🎮 CS Ranking Hub</h1>
-                <p>Ranking de Jogadores & Sorteador de Times 5x5</p>
+                <div class="logo-section">
+                    <div class="logo">🎮</div>
+                    <div>
+                        <h1>CS Ranking Hub</h1>
+                        <p class="subtitle">Ranking de Jogadores & Sorteador de Times</p>
+                    </div>
+                </div>
             </div>
+            <div class="header-glow"></div>
         </header>
 
-        <nav class="tabs">
-            <button class="tab-btn active" data-tab="ranking">📊 Ranking</button>
-            <button class="tab-btn" data-tab="best-player">👑 Best Player</button>
-            <button class="tab-btn" data-tab="players">👥 Jogadores</button>
-            <button class="tab-btn" data-tab="team-builder">🎲 Sorteador de Times</button>
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="nav-tab active" data-tab="ranking">
+                <i class="fas fa-chart-bar"></i>
+                <span>Ranking</span>
+            </button>
+            <button class="nav-tab" data-tab="best-player">
+                <i class="fas fa-crown"></i>
+                <span>Best Player</span>
+            </button>
+            <button class="nav-tab" data-tab="players">
+                <i class="fas fa-users"></i>
+                <span>Jogadores</span>
+            </button>
+            <button class="nav-tab" data-tab="team-builder">
+                <i class="fas fa-dice"></i>
+                <span>Sorteador</span>
+            </button>
         </nav>
 
-        <!-- Tab: Ranking -->
-        <div class="tab-content active" id="ranking">
-            <div class="section">
-                <h2>📊 Ranking da Semana</h2>
+        <!-- Content Sections -->
+        <div class="content">
+            <!-- Ranking Tab -->
+            <div class="tab-pane active" id="ranking">
+                <div class="section-header">
+                    <h2>🏆 Ranking da Semana</h2>
+                    <p class="section-desc">Top jogadores da sua equipe</p>
+                </div>
                 <div id="ranking-list" class="ranking-list">
-                    <p class="loading">Carregando...</p>
+                    <div class="skeleton-loader">
+                        <div class="skeleton"></div>
+                        <div class="skeleton"></div>
+                        <div class="skeleton"></div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Tab: Best Player -->
-        <div class="tab-content" id="best-player">
-            <div class="section">
-                <h2>👑 Melhor Jogador da Semana</h2>
-                <div id="best-player-card" class="best-player-card">
-                    <p class="loading">Carregando...</p>
+            <!-- Best Player Tab -->
+            <div class="tab-pane" id="best-player">
+                <div class="section-header">
+                    <h2>👑 Melhor Jogador da Semana</h2>
+                    <p class="section-desc">Destaque individual</p>
+                </div>
+                <div id="best-player-card" class="best-player-showcase">
+                    <div class="skeleton-card"></div>
                 </div>
             </div>
-        </div>
 
-        <!-- Tab: Players List -->
-        <div class="tab-content" id="players">
-            <div class="section">
-                <h2>👥 Todos os Jogadores</h2>
+            <!-- Players Tab -->
+            <div class="tab-pane" id="players">
+                <div class="section-header">
+                    <h2>👥 Todos os Jogadores</h2>
+                    <p class="section-desc">Base de dados completa</p>
+                </div>
                 <div id="players-grid" class="players-grid">
-                    <p class="loading">Carregando...</p>
+                    <div class="skeleton-grid">
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                        <div class="skeleton-card"></div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Tab: Team Builder -->
-        <div class="tab-content" id="team-builder">
-            <div class="section">
-                <h2>🎲 Sorteador de Times (5x5)</h2>
-                
-                <div class="team-builder-controls">
-                    <div class="player-selector">
+            <!-- Team Builder Tab -->
+            <div class="tab-pane" id="team-builder">
+                <div class="section-header">
+                    <h2>🎲 Sorteador de Times</h2>
+                    <p class="section-desc">Crie times balanceados para 5x5</p>
+                </div>
+
+                <div class="team-builder-wrapper">
+                    <div class="player-selection">
                         <h3>Selecione 10 Jogadores</h3>
                         <div id="player-checkboxes" class="player-checkboxes">
-                            <p class="loading">Carregando...</p>
+                            <div class="skeleton-grid">
+                                <div class="skeleton"></div>
+                                <div class="skeleton"></div>
+                            </div>
                         </div>
                     </div>
-                    
-                    <button id="generate-teams-btn" class="btn-primary" disabled>
-                        🎲 Gerar Times Balanceados
-                    </button>
+
+                    <div class="action-button">
+                        <button id="generate-teams-btn" class="btn-generate" disabled>
+                            <i class="fas fa-magic"></i>
+                            <span>Gerar Times Balanceados</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div id="teams-result" class="teams-result" style="display: none;">
-                    <div class="team-box team-1">
-                        <h3>🔴 TIME 1</h3>
+                <div id="teams-result" class="teams-container" style="display: none;">
+                    <div class="team-card team-red">
+                        <div class="team-header">
+                            <h3><i class="fas fa-shield-alt"></i> TIME 1</h3>
+                            <span class="team-value" id="team-1-value">0</span>
+                        </div>
                         <div id="team-1-players" class="team-players"></div>
-                        <div class="team-stats" id="team-1-stats"></div>
                     </div>
-                    
-                    <div class="team-box team-2">
-                        <h3>🔵 TIME 2</h3>
+
+                    <div class="team-card team-blue">
+                        <div class="team-header">
+                            <h3><i class="fas fa-shield-alt"></i> TIME 2</h3>
+                            <span class="team-value" id="team-2-value">0</span>
+                        </div>
                         <div id="team-2-players" class="team-players"></div>
-                        <div class="team-stats" id="team-2-stats"></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer>
-        <p>CS Ranking Hub © 2024 - Desenvolvido com ❤️</p>
+    <!-- Footer -->
+    <footer class="footer">
+        <p>CS Ranking Hub © 2024 • Desenvolvido com <i class="fas fa-heart"></i></p>
     </footer>
 
     <script src="script.js"></script>
