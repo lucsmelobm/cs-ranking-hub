@@ -1,305 +1,271 @@
-const API_BASE = 'http://localhost:5000/api';
+/* ─── CONFIG ──────────────────────────────── */
+const API = 'http://localhost:5000/api';
 
-let allPlayers = [];
-let selectedPlayers = [];
+/* ─── STATE ───────────────────────────────── */
+let players = [];
+let picked  = [];
 
-const DEMO_PLAYERS = [
-    { name: "Johnny Walker", K: 25, D: 10, A: 8, ADR: 120.5, KDR: 2.5, KAST: 82, score: 85.2, stars: 3 },
-    { name: "Lúcida", K: 20, D: 12, A: 7, ADR: 95.3, KDR: 1.67, KAST: 75, score: 72.1, stars: 2 },
-    { name: "Phoenix", K: 18, D: 14, A: 6, ADR: 88.2, KDR: 1.29, KAST: 70, score: 65.4, stars: 2 },
-    { name: "Apex", K: 22, D: 11, A: 9, ADR: 105.1, KDR: 2.0, KAST: 78, score: 78.9, stars: 3 },
-    { name: "Ghost", K: 16, D: 16, A: 5, ADR: 75.4, KDR: 1.0, KAST: 65, score: 55.3, stars: 1 },
-    { name: "Shadow", K: 19, D: 13, A: 8, ADR: 92.7, KDR: 1.46, KAST: 72, score: 68.5, stars: 2 },
-    { name: "Nova", K: 23, D: 9, A: 10, ADR: 115.2, KDR: 2.56, KAST: 85, score: 82.1, stars: 3 },
-    { name: "Titan", K: 14, D: 18, A: 4, ADR: 68.9, KDR: 0.78, KAST: 60, score: 48.2, stars: 1 },
+/* ─── DEMO DATA (when backend is offline) ─── */
+const DEMO = [
+  { name:'Johnny Walker', K:25, D:10, A:8,  ADR:120.95, KDR:2.50, KAST:82, stars:3, score:87.3, avatar:null },
+  { name:'Nova',          K:23, D:9,  A:10, ADR:115.20, KDR:2.56, KAST:85, stars:3, score:85.1, avatar:null },
+  { name:'Apex',          K:22, D:11, A:9,  ADR:105.10, KDR:2.00, KAST:78, stars:3, score:78.9, avatar:null },
+  { name:'Lúcida',        K:20, D:12, A:7,  ADR:95.30,  KDR:1.67, KAST:75, stars:2, score:72.1, avatar:null },
+  { name:'Shadow',        K:19, D:13, A:8,  ADR:92.70,  KDR:1.46, KAST:72, stars:2, score:68.5, avatar:null },
+  { name:'Phoenix',       K:18, D:14, A:6,  ADR:88.20,  KDR:1.29, KAST:70, stars:2, score:65.4, avatar:null },
+  { name:'Ghost',         K:16, D:16, A:5,  ADR:75.40,  KDR:1.00, KAST:65, stars:1, score:55.3, avatar:null },
+  { name:'Titan',         K:14, D:18, A:4,  ADR:68.90,  KDR:0.78, KAST:60, stars:1, score:48.2, avatar:null },
 ];
 
-document.addEventListener('DOMContentLoaded', () => {
-    setupNavigation();
-    loadInitialData();
-    loadDashboard();
+/* ─── INIT ────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', async () => {
+  initNav();
+  await fetchPlayers();
+  renderDashboard();
+  checkLoginCallback();
+  document.getElementById('syncBtn').addEventListener('click', syncNow);
+  document.getElementById('gen-btn').addEventListener('click', generateTeams);
+  document.getElementById('search').addEventListener('input', e => filterPlayers(e.target.value));
 });
 
-// ============ NAVIGATION ============
-function setupNavigation() {
-    const navTabs = document.querySelectorAll('.nav-tab');
-    const sections = document.querySelectorAll('.tab-section');
+/* ─── NAVIGATION ──────────────────────────── */
+function initNav() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      const page = document.getElementById(btn.dataset.tab);
+      if (page) page.classList.add('active');
 
-    navTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.dataset.tab;
-
-            navTabs.forEach(t => t.classList.remove('active'));
-            sections.forEach(s => s.classList.remove('active'));
-
-            tab.classList.add('active');
-            const section = document.getElementById(tabName);
-            if (section) {
-                section.classList.add('active');
-
-                if (tabName === 'ranking') loadRanking();
-                if (tabName === 'players') loadPlayers();
-                if (tabName === 'team-builder') loadTeamBuilder();
-            }
-        });
+      const tab = btn.dataset.tab;
+      if (tab === 'ranking') renderRanking();
+      if (tab === 'players') renderPlayers(players);
+      if (tab === 'teams')   renderPickGrid();
     });
+  });
 
-    const generateBtn = document.getElementById('generate-teams-btn');
-    if (generateBtn) {
-        generateBtn.addEventListener('click', generateTeams);
-    }
-
-    const steamBtn = document.querySelector('.btn-steam');
-    if (steamBtn) {
-        steamBtn.addEventListener('click', () => {
-            window.location.href = `${API_BASE.replace('/api', '')}/api/steam/login`;
-        });
-    }
-
-    // Verificar se voltou do login
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('login') === 'success') {
-        const player = params.get('player');
-        showNotification(`✅ Bem-vindo, ${player}!`);
-        setTimeout(() => loadInitialData(), 1000);
-    } else if (params.get('login') === 'error') {
-        showNotification('❌ Erro ao fazer login com Steam', 'error');
-    }
-
-    function showNotification(msg, type = 'success') {
-        const div = document.createElement('div');
-        div.style.cssText = `
-            position: fixed; top: 20px; right: 20px;
-            background: ${type === 'error' ? '#ff3333' : '#00cc88'};
-            color: white; padding: 16px 24px;
-            border-radius: 8px; z-index: 10000;
-            animation: slideIn 0.3s ease;
-        `;
-        div.textContent = msg;
-        document.body.appendChild(div);
-        setTimeout(() => div.remove(), 3000);
-    }
+  document.getElementById('steamLoginBtn').addEventListener('click', () => {
+    window.location.href = '/api/steam/login';
+  });
 }
 
-// ============ DATA LOADING ============
-async function loadInitialData() {
-    try {
-        const response = await fetch(`${API_BASE}/players`);
-        const data = await response.json();
-        if (data.success) {
-            allPlayers = data.data || [];
-        } else {
-            allPlayers = DEMO_PLAYERS;
-        }
-    } catch (error) {
-        console.log('Usando dados de exemplo');
-        allPlayers = DEMO_PLAYERS;
-    }
+/* ─── FETCH ───────────────────────────────── */
+async function fetchPlayers() {
+  try {
+    const res  = await fetch(`${API}/players`);
+    const json = await res.json();
+    players = json.success && json.data?.length ? json.data : DEMO;
+  } catch {
+    players = DEMO;
+  }
+  players.sort((a, b) => (b.score || 0) - (a.score || 0));
 }
 
-async function loadDashboard() {
-    try {
-        if (allPlayers.length === 0) {
-            await loadInitialData();
-        }
-
-        const ranking = [...allPlayers].sort((a, b) => (b.score || 0) - (a.score || 0));
-
-        document.getElementById('stat-total').textContent = allPlayers.length;
-        document.getElementById('stat-matches').textContent = allPlayers.length * 5;
-
-        if (ranking.length > 0) {
-            document.getElementById('stat-best').textContent = ranking[0].name.split(' ')[0];
-            const avgScore = (ranking.reduce((a, b) => a + (b.score || 0), 0) / ranking.length).toFixed(1);
-            document.getElementById('stat-avg').textContent = avgScore;
-
-            displayBestPlayer(ranking[0]);
-        }
-
-        displayTopPlayers(ranking.slice(0, 5));
-    } catch (error) {
-        console.error('Erro ao carregar dashboard:', error);
-    }
+async function syncNow() {
+  const btn = document.getElementById('syncBtn');
+  btn.classList.add('spin');
+  try {
+    await fetch(`${API}/sync-now`, { method: 'POST' });
+    await fetchPlayers();
+    renderDashboard();
+    toast('✅ Dados sincronizados!');
+  } catch {
+    toast('❌ Erro ao sincronizar', 'error');
+  }
+  btn.classList.remove('spin');
 }
 
-function displayBestPlayer(player) {
-    const container = document.getElementById('best-player-content');
-    container.innerHTML = `
-        <div class="best-player-name">${player.name}</div>
-        <div class="best-player-stars">${getStarEmoji(player.stars)}</div>
-        <div class="best-player-stats">
-            <div class="stat-item">
-                <div class="stat-item-label">Score</div>
-                <div class="stat-item-value">${(player.score || 0).toFixed(1)}</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-item-label">KDR</div>
-                <div class="stat-item-value">${(player.KDR || 0).toFixed(2)}</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-item-label">ADR</div>
-                <div class="stat-item-value">${(player.ADR || 0).toFixed(1)}</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-item-label">KAST</div>
-                <div class="stat-item-value">${(player.KAST || 0).toFixed(0)}%</div>
-            </div>
+/* ─── DASHBOARD ───────────────────────────── */
+function renderDashboard() {
+  const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const best   = ranked[0];
+
+  /* Stats */
+  qs('#s-total').textContent = players.length;
+  qs('#s-best').textContent  = best ? first(best.name) : '--';
+  qs('#s-kdr').textContent   = avg(players, 'KDR').toFixed(2);
+  qs('#s-adr').textContent   = avg(players, 'ADR').toFixed(0);
+
+  /* Best Player */
+  const bp = qs('#best-player-body');
+  if (!best) { bp.innerHTML = '<div class="empty-msg">Nenhum dado</div>'; return; }
+  bp.innerHTML = `
+    <div class="bp-avatar">
+      ${best.avatar ? `<img src="${best.avatar}" alt="${best.name}">` : '🎮'}
+    </div>
+    <div class="bp-name">${best.name}</div>
+    <div class="bp-stars">${stars(best.stars)}</div>
+    <div class="bp-stats">
+      <div class="bp-stat"><div class="bp-stat-label">Score</div><div class="bp-stat-value">${fmt(best.score)}</div></div>
+      <div class="bp-stat"><div class="bp-stat-label">KDR</div><div class="bp-stat-value">${fmt(best.KDR, 2)}</div></div>
+      <div class="bp-stat"><div class="bp-stat-label">ADR</div><div class="bp-stat-value">${fmt(best.ADR)}</div></div>
+      <div class="bp-stat"><div class="bp-stat-label">KAST</div><div class="bp-stat-value">${fmt(best.KAST, 0)}%</div></div>
+    </div>`;
+
+  /* Top list */
+  qs('#top-list').innerHTML = ranked.slice(0, 6).map((p, i) => `
+    <li class="player-list-item">
+      <div class="pl-rank">${i + 1}</div>
+      <div>
+        <div class="pl-name">${p.name}</div>
+        <div class="pl-sub">${stars(p.stars)} • KDR ${fmt(p.KDR, 2)}</div>
+      </div>
+      <div class="pl-score">${fmt(p.score)}</div>
+    </li>`).join('');
+}
+
+/* ─── RANKING ─────────────────────────────── */
+function renderRanking() {
+  const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+  qs('#ranking-list').innerHTML = ranked.map((p, i) => `
+    <li class="rank-item">
+      <span class="rank-pos">${medal(i + 1)}</span>
+      <div class="rank-info">
+        <div class="rank-name">${p.name} ${stars(p.stars)}</div>
+        <div class="rank-meta">
+          <span>KDR ${fmt(p.KDR, 2)}</span>
+          <span>ADR ${fmt(p.ADR)}</span>
+          <span>KAST ${fmt(p.KAST, 0)}%</span>
+          <span>K ${p.K ?? 0}</span>
+          <span>D ${p.D ?? 0}</span>
         </div>
-    `;
+      </div>
+      <span class="rank-score">${fmt(p.score)}</span>
+    </li>`).join('');
 }
 
-function displayTopPlayers(players) {
-    const container = document.getElementById('top-players');
-    if (!players || players.length === 0) {
-        container.innerHTML = '<p>Sem dados</p>';
-        return;
-    }
-
-    container.innerHTML = players.map((p, i) => `
-        <div class="player-row">
-            <div class="player-rank">${i + 1}</div>
-            <div class="player-info">
-                <div class="player-name">${p.name}</div>
-                <div class="player-stats">${getStarEmoji(p.stars)} • KDR: ${(p.KDR || 0).toFixed(2)}</div>
-            </div>
-            <div class="player-score">${(p.score || 0).toFixed(1)}</div>
-        </div>
-    `).join('');
+/* ─── PLAYERS GRID ────────────────────────── */
+function renderPlayers(list) {
+  qs('#players-grid').innerHTML = list.length
+    ? list.map(p => `
+        <div class="player-card">
+          <div class="pc-avatar">
+            ${p.avatar ? `<img src="${p.avatar}" alt="${p.name}">` : '🎮'}
+          </div>
+          <div class="pc-name">${p.name}</div>
+          <div class="pc-stars">${stars(p.stars)}</div>
+          <div class="pc-stats">
+            ${stat('Score', fmt(p.score))}
+            ${stat('KDR',   fmt(p.KDR, 2))}
+            ${stat('ADR',   fmt(p.ADR))}
+            ${stat('KAST',  fmt(p.KAST, 0) + '%')}
+            ${stat('Kills', p.K ?? 0)}
+            ${stat('Deaths', p.D ?? 0)}
+            ${stat('Assists', p.A ?? 0)}
+          </div>
+        </div>`).join('')
+    : '<div class="empty-msg">Nenhum jogador encontrado</div>';
 }
 
-async function loadRanking() {
-    const container = document.getElementById('ranking-list');
-
-    if (allPlayers.length === 0) {
-        await loadInitialData();
-    }
-
-    const ranking = [...allPlayers].sort((a, b) => (b.score || 0) - (a.score || 0));
-
-    container.innerHTML = ranking.map((p, i) => `
-        <div class="ranking-row">
-            <div class="ranking-position">${getPositionEmoji(i + 1)}</div>
-            <div class="ranking-details">
-                <div class="ranking-name">${p.name}</div>
-                <div class="ranking-stats">
-                    <span>${getStarEmoji(p.stars)}</span>
-                    <span>KDR: ${(p.KDR || 0).toFixed(2)}</span>
-                    <span>ADR: ${(p.ADR || 0).toFixed(1)}</span>
-                </div>
-            </div>
-            <div class="ranking-score">${(p.score || 0).toFixed(1)}</div>
-        </div>
-    `).join('');
+function filterPlayers(q) {
+  const filtered = players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  renderPlayers(filtered);
 }
 
-async function loadPlayers() {
-    const container = document.getElementById('players-grid');
+/* ─── TEAM BUILDER ────────────────────────── */
+function renderPickGrid() {
+  picked = [];
+  updatePickCount();
+  qs('#teams-result').style.display = 'none';
+  qs('#gen-btn').disabled = true;
 
-    if (allPlayers.length === 0) {
-        await loadInitialData();
-    }
-
-    container.innerHTML = allPlayers.map(p => `
-        <div class="glass-card player-card">
-            <div class="player-card-title">${p.name}</div>
-            <div class="player-card-stars">${getStarEmoji(p.stars)}</div>
-            <div class="player-card-stats">
-                <div class="player-card-stat">
-                    <span class="player-card-stat-label">Score</span>
-                    <span class="player-card-stat-value">${(p.score || 0).toFixed(1)}</span>
-                </div>
-                <div class="player-card-stat">
-                    <span class="player-card-stat-label">KDR</span>
-                    <span class="player-card-stat-value">${(p.KDR || 0).toFixed(2)}</span>
-                </div>
-                <div class="player-card-stat">
-                    <span class="player-card-stat-label">ADR</span>
-                    <span class="player-card-stat-value">${(p.ADR || 0).toFixed(1)}</span>
-                </div>
-                <div class="player-card-stat">
-                    <span class="player-card-stat-label">Kills</span>
-                    <span class="player-card-stat-value">${p.K || 0}</span>
-                </div>
-            </div>
-        </div>
-    `).join('');
+  qs('#pick-grid').innerHTML = players.map(p => `
+    <label class="pick-item" id="pick-${slug(p.name)}">
+      <input type="checkbox" value="${slug(p.name)}" onchange="togglePick(this, '${slug(p.name)}')">
+      <span class="pick-label">${p.name}</span>
+      <span class="pick-stars">${stars(p.stars)}</span>
+    </label>`).join('');
 }
 
-async function loadTeamBuilder() {
-    const container = document.getElementById('player-checkboxes');
+function togglePick(el, id) {
+  const p    = players.find(x => slug(x.name) === id);
+  const item = document.getElementById(`pick-${id}`);
+  if (!p) return;
 
-    if (allPlayers.length === 0) {
-        await loadInitialData();
-    }
-
-    container.innerHTML = allPlayers.map(p => `
-        <label class="checkbox-item">
-            <input type="checkbox" data-player='${JSON.stringify(p)}' onchange="updateSelectedPlayers()">
-            <span class="checkbox-label">${p.name} ${getStarEmoji(p.stars)}</span>
-        </label>
-    `).join('');
+  if (el.checked) {
+    if (picked.length >= 10) { el.checked = false; toast('Máximo de 10 jogadores!', 'error'); return; }
+    picked.push(p);
+    item.classList.add('selected');
+  } else {
+    picked = picked.filter(x => slug(x.name) !== id);
+    item.classList.remove('selected');
+  }
+  updatePickCount();
 }
 
-function updateSelectedPlayers() {
-    const checks = document.querySelectorAll('.checkbox-item input:checked');
-    selectedPlayers = Array.from(checks).map(c => JSON.parse(c.dataset.player));
-
-    const btn = document.getElementById('generate-teams-btn');
-    btn.disabled = selectedPlayers.length !== 10;
+function updatePickCount() {
+  qs('#sel-count').textContent = `${picked.length} / 10`;
+  qs('#gen-btn').disabled = picked.length !== 10;
 }
 
 async function generateTeams() {
-    if (selectedPlayers.length !== 10) {
-        alert('Selecione 10 jogadores!');
-        return;
-    }
+  try {
+    const res  = await fetch(`${API}/teams`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ players: picked })
+    });
+    const json = await res.json();
+    if (json.success) return showTeams(json.data);
+  } catch { /* fallback below */ }
 
-    try {
-        const response = await fetch(`${API_BASE}/teams`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ players: selectedPlayers })
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            displayTeams(data.data);
-        }
-    } catch (error) {
-        alert('Erro ao gerar times');
-    }
+  /* local fallback */
+  const sorted = [...picked].sort((a, b) => (b.stars || 1) - (a.stars || 1));
+  const t1 = [], t2 = [];
+  sorted.forEach((p, i) => (i % 2 === 0 ? t1 : t2).push(p));
+  showTeams({
+    team1: t1, team2: t2,
+    team1_value: t1.reduce((s, p) => s + (p.stars || 1), 0),
+    team2_value: t2.reduce((s, p) => s + (p.stars || 1), 0)
+  });
 }
 
-function displayTeams(teams) {
-    const result = document.getElementById('teams-result');
+function showTeams(data) {
+  qs('#stars-a').textContent = `${data.team1_value}⭐`;
+  qs('#stars-b').textContent = `${data.team2_value}⭐`;
 
-    document.getElementById('team-1-value').textContent = `${teams.team1_value}⭐`;
-    document.getElementById('team-2-value').textContent = `${teams.team2_value}⭐`;
+  qs('#players-a').innerHTML = data.team1.map((p, i) => `
+    <li class="team-player-row red">
+      <span class="tp-name">${i+1}. ${p.name} ${stars(p.stars)}</span>
+      <span class="tp-adr">ADR ${fmt(p.ADR)}</span>
+    </li>`).join('');
 
-    document.getElementById('team-1-players').innerHTML = teams.team1.map((p, i) => `
-        <div class="team-player-item">
-            <span class="team-player-name">${i + 1}. ${p.name} ${getStarEmoji(p.stars)}</span>
-            <span class="team-player-adr">ADR: ${(p.ADR || 0).toFixed(1)}</span>
-        </div>
-    `).join('');
+  qs('#players-b').innerHTML = data.team2.map((p, i) => `
+    <li class="team-player-row blue">
+      <span class="tp-name">${i+1}. ${p.name} ${stars(p.stars)}</span>
+      <span class="tp-adr">ADR ${fmt(p.ADR)}</span>
+    </li>`).join('');
 
-    document.getElementById('team-2-players').innerHTML = teams.team2.map((p, i) => `
-        <div class="team-player-item">
-            <span class="team-player-name">${i + 1}. ${p.name} ${getStarEmoji(p.stars)}</span>
-            <span class="team-player-adr">ADR: ${(p.ADR || 0).toFixed(1)}</span>
-        </div>
-    `).join('');
-
-    result.style.display = 'grid';
+  qs('#teams-result').style.display = 'grid';
+  qs('#teams-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function getStarEmoji(stars) {
-    return '⭐'.repeat(stars || 1);
+/* ─── STEAM LOGIN CALLBACK ────────────────── */
+function checkLoginCallback() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('login') === 'success') {
+    toast(`✅ Bem-vindo, ${p.get('player') || 'Jogador'}!`);
+    history.replaceState({}, '', '/');
+  } else if (p.get('login') === 'error') {
+    toast('❌ Erro no login Steam', 'error');
+    history.replaceState({}, '', '/');
+  }
 }
 
-function getPositionEmoji(pos) {
-    if (pos === 1) return '🥇';
-    if (pos === 2) return '🥈';
-    if (pos === 3) return '🥉';
-    return pos;
+/* ─── TOAST ───────────────────────────────── */
+function toast(msg, type = 'success') {
+  const el = qs('#toast');
+  el.textContent = msg;
+  el.className   = `toast show ${type === 'error' ? 'error' : ''}`;
+  setTimeout(() => el.classList.remove('show'), 3000);
 }
+
+/* ─── HELPERS ─────────────────────────────── */
+const qs   = sel => document.querySelector(sel);
+const fmt  = (v, d = 1) => (+v || 0).toFixed(d);
+const avg  = (arr, key) => arr.length ? arr.reduce((s, p) => s + (+p[key] || 0), 0) / arr.length : 0;
+const first = str => str.split(' ')[0];
+const slug  = str => str.toLowerCase().replace(/\s+/g, '-');
+const stars = n => '⭐'.repeat(Math.max(1, Math.min(3, n || 1)));
+const stat  = (k, v) => `<div class="pc-stat"><span class="pc-stat-k">${k}</span><span class="pc-stat-v">${v}</span></div>`;
+const medal = i => i === 1 ? '🥇' : i === 2 ? '🥈' : i === 3 ? '🥉' : `#${i}`;

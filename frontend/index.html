@@ -1,148 +1,210 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CS Ranking Hub</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CS Ranking Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <div class="logo">
-                    <span class="logo-icon">🎮</span>
-                    <span class="logo-text">CS Ranking Hub</span>
-                </div>
-                <nav class="nav-tabs">
-                    <button class="nav-tab active" data-tab="dashboard">
-                        <i class="fas fa-chart-line"></i>Dashboard
-                    </button>
-                    <button class="nav-tab" data-tab="ranking">
-                        <i class="fas fa-trophy"></i>Ranking
-                    </button>
-                    <button class="nav-tab" data-tab="players">
-                        <i class="fas fa-users"></i>Jogadores
-                    </button>
-                    <button class="nav-tab" data-tab="team-builder">
-                        <i class="fas fa-dice"></i>Times
-                    </button>
-                </nav>
-            </div>
-            <div class="header-actions">
-                <button class="btn-steam">
-                    <i class="fab fa-steam"></i> Login Steam
-                </button>
-            </div>
-        </header>
 
-        <!-- Main Content -->
-        <main class="main">
-            <!-- Dashboard -->
-            <section class="tab-section active" id="dashboard">
-                <div class="section-title">
-                    <h2>Dashboard Overview</h2>
-                </div>
+  <!-- Background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
 
-                <div class="stats-grid">
-                    <div class="glass-card stat-card">
-                        <div class="stat-icon">👥</div>
-                        <div class="stat-label">Total Jogadores</div>
-                        <div class="stat-value" id="stat-total">0</div>
-                    </div>
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
 
-                    <div class="glass-card stat-card">
-                        <div class="stat-icon">🏆</div>
-                        <div class="stat-label">Best Player</div>
-                        <div class="stat-value" id="stat-best">--</div>
-                    </div>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-emoji">🎮</span>
+        <span class="logo-label">CS Ranking Hub</span>
+      </div>
 
-                    <div class="glass-card stat-card">
-                        <div class="stat-icon">⭐</div>
-                        <div class="stat-label">Avg Score</div>
-                        <div class="stat-value" id="stat-avg">0</div>
-                    </div>
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="dashboard">
+          <i class="fas fa-chart-line"></i>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-tab="ranking">
+          <i class="fas fa-trophy"></i>
+          <span>Ranking</span>
+        </button>
+        <button class="nav-btn" data-tab="players">
+          <i class="fas fa-users"></i>
+          <span>Jogadores</span>
+        </button>
+        <button class="nav-btn" data-tab="teams">
+          <i class="fas fa-dice"></i>
+          <span>Times</span>
+        </button>
+      </nav>
 
-                    <div class="glass-card stat-card">
-                        <div class="stat-icon">🎯</div>
-                        <div class="stat-label">Partidas</div>
-                        <div class="stat-value" id="stat-matches">0</div>
-                    </div>
-                </div>
-
-                <div class="content-grid">
-                    <div class="glass-card">
-                        <h3>👑 Best Player da Semana</h3>
-                        <div id="best-player-content" class="best-player-showcase">
-                            <p>Carregando...</p>
-                        </div>
-                    </div>
-
-                    <div class="glass-card">
-                        <h3>🏆 Top 5 Jogadores</h3>
-                        <div id="top-players" class="top-players">
-                            <p>Carregando...</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Ranking -->
-            <section class="tab-section" id="ranking">
-                <div class="section-title">
-                    <h2>Ranking Geral</h2>
-                </div>
-                <div class="glass-card">
-                    <div id="ranking-list" class="ranking-list">
-                        <p>Carregando...</p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Jogadores -->
-            <section class="tab-section" id="players">
-                <div class="section-title">
-                    <h2>Todos os Jogadores</h2>
-                </div>
-                <div id="players-grid" class="players-grid">
-                    <p>Carregando...</p>
-                </div>
-            </section>
-
-            <!-- Team Builder -->
-            <section class="tab-section" id="team-builder">
-                <div class="section-title">
-                    <h2>🎲 Sorteador de Times</h2>
-                </div>
-
-                <div class="glass-card">
-                    <h3>Selecione 10 Jogadores</h3>
-                    <div id="player-checkboxes" class="player-checkboxes">
-                        <p>Carregando...</p>
-                    </div>
-                    <button id="generate-teams-btn" class="btn-primary" disabled>
-                        <i class="fas fa-magic"></i> Gerar Times
-                    </button>
-                </div>
-
-                <div id="teams-result" class="teams-grid" style="display: none;">
-                    <div class="glass-card team-card team-1">
-                        <h4>🔴 TIME 1</h4>
-                        <div id="team-1-players" class="team-players"></div>
-                        <div class="team-value" id="team-1-value">0⭐</div>
-                    </div>
-                    <div class="glass-card team-card team-2">
-                        <h4>🔵 TIME 2</h4>
-                        <div id="team-2-players" class="team-players"></div>
-                        <div class="team-value" id="team-2-value">0⭐</div>
-                    </div>
-                </div>
-            </section>
-        </main>
+      <div class="header-actions">
+        <button class="btn-steam" id="steamLoginBtn">
+          <i class="fab fa-steam"></i>
+          <span>Login Steam</span>
+        </button>
+      </div>
     </div>
+  </header>
 
-    <script src="script.js"></script>
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ========== DASHBOARD ========== -->
+    <section class="tab-page active" id="dashboard">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-sub">Visão geral da sua equipe</p>
+        </div>
+        <button class="btn-sync" id="syncBtn" title="Sincronizar dados agora">
+          <i class="fas fa-sync-alt"></i>
+          <span>Sincronizar</span>
+        </button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="glass-card stat-card">
+          <div class="stat-icon-wrap" style="--c:#00d4ff">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">Jogadores</span>
+            <span class="stat-val" id="s-total">--</span>
+          </div>
+        </div>
+        <div class="glass-card stat-card">
+          <div class="stat-icon-wrap" style="--c:#ff006e">
+            <i class="fas fa-crown"></i>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">Best Player</span>
+            <span class="stat-val" id="s-best">--</span>
+          </div>
+        </div>
+        <div class="glass-card stat-card">
+          <div class="stat-icon-wrap" style="--c:#8338ec">
+            <i class="fas fa-chart-bar"></i>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">Avg KDR</span>
+            <span class="stat-val" id="s-kdr">--</span>
+          </div>
+        </div>
+        <div class="glass-card stat-card">
+          <div class="stat-icon-wrap" style="--c:#fb5607">
+            <i class="fas fa-fire"></i>
+          </div>
+          <div class="stat-body">
+            <span class="stat-label">Avg ADR</span>
+            <span class="stat-val" id="s-adr">--</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="glass-card">
+          <div class="card-hdr">
+            <span>👑 Best Player da Semana</span>
+          </div>
+          <div id="best-player-body" class="best-player-body">
+            <div class="empty-msg">Nenhum dado ainda</div>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-hdr">
+            <span>🏆 Top Jogadores</span>
+          </div>
+          <ul id="top-list" class="player-list">
+            <li class="empty-msg">Nenhum dado ainda</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== RANKING ========== -->
+    <section class="tab-page" id="ranking">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Ranking</h1>
+          <p class="page-sub">Classificação geral de performance</p>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <ul id="ranking-list" class="ranking-list">
+          <li class="empty-msg">Carregando...</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ========== JOGADORES ========== -->
+    <section class="tab-page" id="players">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Jogadores</h1>
+          <p class="page-sub">Perfis e estatísticas completas</p>
+        </div>
+        <input class="search-box" id="search" type="text" placeholder="Buscar jogador…" />
+      </div>
+
+      <div id="players-grid" class="players-grid">
+        <div class="empty-msg">Carregando...</div>
+      </div>
+    </section>
+
+    <!-- ========== TIMES ========== -->
+    <section class="tab-page" id="teams">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Sorteador de Times</h1>
+          <p class="page-sub">Selecione 10 jogadores para um 5v5 balanceado</p>
+        </div>
+      </div>
+
+      <div class="glass-card" style="margin-bottom:24px">
+        <div class="card-hdr">
+          <span>Selecione 10 Jogadores</span>
+          <span id="sel-count" class="sel-badge">0 / 10</span>
+        </div>
+        <div id="pick-grid" class="pick-grid">
+          <div class="empty-msg">Carregando jogadores…</div>
+        </div>
+        <button id="gen-btn" class="btn-primary" disabled>
+          <i class="fas fa-shuffle"></i> Gerar Times Balanceados
+        </button>
+      </div>
+
+      <div id="teams-result" class="teams-result" style="display:none">
+        <div class="glass-card team-card" id="team-a">
+          <div class="team-hdr team-hdr--red">
+            <i class="fas fa-shield-alt"></i> TIME 1
+            <span class="team-stars" id="stars-a"></span>
+          </div>
+          <ul id="players-a" class="team-player-list"></ul>
+        </div>
+        <div class="glass-card team-card" id="team-b">
+          <div class="team-hdr team-hdr--blue">
+            <i class="fas fa-shield-alt"></i> TIME 2
+            <span class="team-stars" id="stars-b"></span>
+          </div>
+          <ul id="players-b" class="team-player-list"></ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>
