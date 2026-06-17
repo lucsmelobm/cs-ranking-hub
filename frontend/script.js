@@ -52,8 +52,32 @@ function setupNavigation() {
     const steamBtn = document.querySelector('.btn-steam');
     if (steamBtn) {
         steamBtn.addEventListener('click', () => {
-            alert('🔐 Login Steam será implementado em breve!');
+            window.location.href = `${API_BASE.replace('/api', '')}/api/steam/login`;
         });
+    }
+
+    // Verificar se voltou do login
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('login') === 'success') {
+        const player = params.get('player');
+        showNotification(`✅ Bem-vindo, ${player}!`);
+        setTimeout(() => loadInitialData(), 1000);
+    } else if (params.get('login') === 'error') {
+        showNotification('❌ Erro ao fazer login com Steam', 'error');
+    }
+
+    function showNotification(msg, type = 'success') {
+        const div = document.createElement('div');
+        div.style.cssText = `
+            position: fixed; top: 20px; right: 20px;
+            background: ${type === 'error' ? '#ff3333' : '#00cc88'};
+            color: white; padding: 16px 24px;
+            border-radius: 8px; z-index: 10000;
+            animation: slideIn 0.3s ease;
+        `;
+        div.textContent = msg;
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 3000);
     }
 }
 
