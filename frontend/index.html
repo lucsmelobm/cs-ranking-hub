@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS Ranking Hub - Ranking & Team Builder</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>🎮 CS Ranking Hub</h1>
+                <p>Ranking de Jogadores & Sorteador de Times 5x5</p>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="ranking">📊 Ranking</button>
+            <button class="tab-btn" data-tab="best-player">👑 Best Player</button>
+            <button class="tab-btn" data-tab="players">👥 Jogadores</button>
+            <button class="tab-btn" data-tab="team-builder">🎲 Sorteador de Times</button>
+        </nav>
+
+        <!-- Tab: Ranking -->
+        <div class="tab-content active" id="ranking">
+            <div class="section">
+                <h2>📊 Ranking da Semana</h2>
+                <div id="ranking-list" class="ranking-list">
+                    <p class="loading">Carregando...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Best Player -->
+        <div class="tab-content" id="best-player">
+            <div class="section">
+                <h2>👑 Melhor Jogador da Semana</h2>
+                <div id="best-player-card" class="best-player-card">
+                    <p class="loading">Carregando...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Players List -->
+        <div class="tab-content" id="players">
+            <div class="section">
+                <h2>👥 Todos os Jogadores</h2>
+                <div id="players-grid" class="players-grid">
+                    <p class="loading">Carregando...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Team Builder -->
+        <div class="tab-content" id="team-builder">
+            <div class="section">
+                <h2>🎲 Sorteador de Times (5x5)</h2>
+                
+                <div class="team-builder-controls">
+                    <div class="player-selector">
+                        <h3>Selecione 10 Jogadores</h3>
+                        <div id="player-checkboxes" class="player-checkboxes">
+                            <p class="loading">Carregando...</p>
+                        </div>
+                    </div>
+                    
+                    <button id="generate-teams-btn" class="btn-primary" disabled>
+                        🎲 Gerar Times Balanceados
+                    </button>
+                </div>
+
+                <div id="teams-result" class="teams-result" style="display: none;">
+                    <div class="team-box team-1">
+                        <h3>🔴 TIME 1</h3>
+                        <div id="team-1-players" class="team-players"></div>
+                        <div class="team-stats" id="team-1-stats"></div>
+                    </div>
+                    
+                    <div class="team-box team-2">
+                        <h3>🔵 TIME 2</h3>
+                        <div id="team-2-players" class="team-players"></div>
+                        <div class="team-stats" id="team-2-stats"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>CS Ranking Hub © 2024 - Desenvolvido com ❤️</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
