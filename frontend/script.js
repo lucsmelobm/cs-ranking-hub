@@ -3,21 +3,11 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
   ? 'http://localhost:5000/api'
   : 'https://cs-ranking-hub.onrender.com/api';
 
+const BACKEND = API.replace('/api', '');
+
 /* ─── STATE ───────────────────────────────── */
 let players = [];
 let picked  = [];
-
-/* ─── DEMO DATA (when backend is offline) ─── */
-const DEMO = [
-  { name:'Johnny Walker', K:25, D:10, A:8,  ADR:120.95, KDR:2.50, KAST:82, stars:3, score:87.3, avatar:null },
-  { name:'Nova',          K:23, D:9,  A:10, ADR:115.20, KDR:2.56, KAST:85, stars:3, score:85.1, avatar:null },
-  { name:'Apex',          K:22, D:11, A:9,  ADR:105.10, KDR:2.00, KAST:78, stars:3, score:78.9, avatar:null },
-  { name:'Lúcida',        K:20, D:12, A:7,  ADR:95.30,  KDR:1.67, KAST:75, stars:2, score:72.1, avatar:null },
-  { name:'Shadow',        K:19, D:13, A:8,  ADR:92.70,  KDR:1.46, KAST:72, stars:2, score:68.5, avatar:null },
-  { name:'Phoenix',       K:18, D:14, A:6,  ADR:88.20,  KDR:1.29, KAST:70, stars:2, score:65.4, avatar:null },
-  { name:'Ghost',         K:16, D:16, A:5,  ADR:75.40,  KDR:1.00, KAST:65, stars:1, score:55.3, avatar:null },
-  { name:'Titan',         K:14, D:18, A:4,  ADR:68.90,  KDR:0.78, KAST:60, stars:1, score:48.2, avatar:null },
-];
 
 /* ─── INIT ────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -48,7 +38,7 @@ function initNav() {
   });
 
   document.getElementById('steamLoginBtn').addEventListener('click', () => {
-    window.location.href = '/api/steam/login';
+    window.location.href = `${BACKEND}/api/steam/login`;
   });
 }
 
@@ -57,9 +47,9 @@ async function fetchPlayers() {
   try {
     const res  = await fetch(`${API}/players`);
     const json = await res.json();
-    players = json.success && json.data?.length ? json.data : DEMO;
+    players = json.success && json.data?.length ? json.data : [];
   } catch {
-    players = DEMO;
+    players = [];
   }
   players.sort((a, b) => (b.score || 0) - (a.score || 0));
 }
@@ -84,41 +74,52 @@ function renderDashboard() {
   const best   = ranked[0];
 
   /* Stats */
-  qs('#s-total').textContent = players.length;
+  qs('#s-total').textContent = players.length || '--';
   qs('#s-best').textContent  = best ? first(best.name) : '--';
-  qs('#s-kdr').textContent   = avg(players, 'KDR').toFixed(2);
-  qs('#s-adr').textContent   = avg(players, 'ADR').toFixed(0);
+  qs('#s-kdr').textContent   = players.length ? avg(players, 'KDR').toFixed(2) : '--';
+  qs('#s-adr').textContent   = players.length ? avg(players, 'ADR').toFixed(0) : '--';
 
   /* Best Player */
   const bp = qs('#best-player-body');
-  if (!best) { bp.innerHTML = '<div class="empty-msg">Nenhum dado</div>'; return; }
-  bp.innerHTML = `
-    <div class="bp-avatar">
-      ${best.avatar ? `<img src="${best.avatar}" alt="${best.name}">` : '🎮'}
-    </div>
-    <div class="bp-name">${best.name}</div>
-    <div class="bp-stars">${stars(best.stars)}</div>
-    <div class="bp-stats">
-      <div class="bp-stat"><div class="bp-stat-label">Score</div><div class="bp-stat-value">${fmt(best.score)}</div></div>
-      <div class="bp-stat"><div class="bp-stat-label">KDR</div><div class="bp-stat-value">${fmt(best.KDR, 2)}</div></div>
-      <div class="bp-stat"><div class="bp-stat-label">ADR</div><div class="bp-stat-value">${fmt(best.ADR)}</div></div>
-      <div class="bp-stat"><div class="bp-stat-label">KAST</div><div class="bp-stat-value">${fmt(best.KAST, 0)}%</div></div>
-    </div>`;
+  if (!best) {
+    bp.innerHTML = steamCTA('Faça login para ver o destaque da semana');
+  } else {
+    bp.innerHTML = `
+      <div class="bp-avatar">
+        ${best.avatar ? `<img src="${best.avatar}" alt="${best.name}">` : '🎮'}
+      </div>
+      <div class="bp-name">${best.name}</div>
+      <div class="bp-stars">${stars(best.stars)}</div>
+      <div class="bp-stats">
+        <div class="bp-stat"><div class="bp-stat-label">Score</div><div class="bp-stat-value">${fmt(best.score)}</div></div>
+        <div class="bp-stat"><div class="bp-stat-label">KDR</div><div class="bp-stat-value">${fmt(best.KDR, 2)}</div></div>
+        <div class="bp-stat"><div class="bp-stat-label">ADR</div><div class="bp-stat-value">${fmt(best.ADR)}</div></div>
+        <div class="bp-stat"><div class="bp-stat-label">KAST</div><div class="bp-stat-value">${fmt(best.KAST, 0)}%</div></div>
+      </div>`;
+  }
 
   /* Top list */
-  qs('#top-list').innerHTML = ranked.slice(0, 6).map((p, i) => `
-    <li class="player-list-item">
-      <div class="pl-rank">${i + 1}</div>
-      <div>
-        <div class="pl-name">${p.name}</div>
-        <div class="pl-sub">${stars(p.stars)} • KDR ${fmt(p.KDR, 2)}</div>
-      </div>
-      <div class="pl-score">${fmt(p.score)}</div>
-    </li>`).join('');
+  if (!ranked.length) {
+    qs('#top-list').innerHTML = `<li>${steamCTA('Nenhum jogador ainda. Faça login com Steam!')}</li>`;
+  } else {
+    qs('#top-list').innerHTML = ranked.slice(0, 6).map((p, i) => `
+      <li class="player-list-item">
+        <div class="pl-rank">${i + 1}</div>
+        <div>
+          <div class="pl-name">${p.name}</div>
+          <div class="pl-sub">${stars(p.stars)} • KDR ${fmt(p.KDR, 2)}</div>
+        </div>
+        <div class="pl-score">${fmt(p.score)}</div>
+      </li>`).join('');
+  }
 }
 
 /* ─── RANKING ─────────────────────────────── */
 function renderRanking() {
+  if (!players.length) {
+    qs('#ranking-list').innerHTML = `<li>${steamCTA('Faça login com Steam para aparecer no ranking')}</li>`;
+    return;
+  }
   const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
   qs('#ranking-list').innerHTML = ranked.map((p, i) => `
     <li class="rank-item">
@@ -139,6 +140,10 @@ function renderRanking() {
 
 /* ─── PLAYERS GRID ────────────────────────── */
 function renderPlayers(list) {
+  if (!players.length) {
+    qs('#players-grid').innerHTML = steamCTA('Faça login com Steam para ver os perfis dos jogadores');
+    return;
+  }
   qs('#players-grid').innerHTML = list.length
     ? list.map(p => `
         <div class="player-card">
@@ -171,6 +176,11 @@ function renderPickGrid() {
   updatePickCount();
   qs('#teams-result').style.display = 'none';
   qs('#gen-btn').disabled = true;
+
+  if (!players.length) {
+    qs('#pick-grid').innerHTML = steamCTA('Faça login com Steam para sortear os times');
+    return;
+  }
 
   qs('#pick-grid').innerHTML = players.map(p => `
     <label class="pick-item" id="pick-${slug(p.name)}">
@@ -271,3 +281,13 @@ const slug  = str => str.toLowerCase().replace(/\s+/g, '-');
 const stars = n => '⭐'.repeat(Math.max(1, Math.min(3, n || 1)));
 const stat  = (k, v) => `<div class="pc-stat"><span class="pc-stat-k">${k}</span><span class="pc-stat-v">${v}</span></div>`;
 const medal = i => i === 1 ? '🥇' : i === 2 ? '🥈' : i === 3 ? '🥉' : `#${i}`;
+const steamCTA = (msg) => `
+  <div class="steam-cta">
+    <div class="steam-cta-icon">🎮</div>
+    <div class="steam-cta-msg">${msg}</div>
+    <button class="btn-steam-cta" onclick="window.location.href='${BACKEND}/api/steam/login'">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12c0 5.303 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+      Entrar com Steam
+    </button>
+  </div>`;
+

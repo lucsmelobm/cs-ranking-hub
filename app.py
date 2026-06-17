@@ -110,6 +110,8 @@ scheduler.add_job(
     id='daily_sync',
     name='Sincronização diária às 7h'
 )
+scheduler.start()
+print("✅ Scheduler iniciado - sincronização às 7h")
 
 # ============ ROUTES ============
 
@@ -271,8 +273,4 @@ def sync_now():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Iniciar scheduler
-    scheduler.start()
-    print("✅ Scheduler iniciado - Sincronização agendada para 7h da manhã")
-
     app.run(debug=True, host='0.0.0.0', port=5000)
