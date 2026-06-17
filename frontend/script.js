@@ -1,45 +1,40 @@
-// ============ CONFIGURATION ============
 const API_BASE = 'http://localhost:5000/api';
 
-// ============ STATE ============
 let allPlayers = [];
 let selectedPlayers = [];
 
-// ============ INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     loadInitialData();
-    setupEventListeners();
-    loadRanking();
+    loadDashboard();
 });
 
 // ============ NAVIGATION ============
 function setupNavigation() {
-    const navTabs = document.querySelectorAll('.nav-tab');
-    const tabPanes = document.querySelectorAll('.tab-pane');
+    const navItems = document.querySelectorAll('.nav-item');
+    const sections = document.querySelectorAll('.tab-section');
 
-    navTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.dataset.tab;
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tabName = item.dataset.tab;
 
-            navTabs.forEach(t => t.classList.remove('active'));
-            tabPanes.forEach(p => p.classList.remove('active'));
+            navItems.forEach(n => n.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active'));
 
-            tab.classList.add('active');
-            const pane = document.getElementById(tabName);
-            if (pane) {
-                pane.classList.add('active');
+            item.classList.add('active');
+            const section = document.getElementById(tabName);
+            if (section) {
+                section.classList.add('active');
 
                 if (tabName === 'ranking') loadRanking();
-                if (tabName === 'best-player') loadBestPlayer();
                 if (tabName === 'players') loadPlayers();
                 if (tabName === 'team-builder') loadPlayersForTeamBuilder();
+                if (tabName === 'dashboard') loadDashboard();
             }
         });
     });
-}
 
-function setupEventListeners() {
     const generateBtn = document.getElementById('generate-teams-btn');
     if (generateBtn) {
         generateBtn.addEventListener('click', generateTeams);
@@ -55,130 +50,157 @@ async function loadInitialData() {
             allPlayers = data.data || [];
         }
     } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        console.error('Erro:', error);
     }
+}
+
+async function loadDashboard() {
+    try {
+        const response = await fetch(`${API_BASE}/players`);
+        const data = await response.json();
+
+        if (data.success && data.data) {
+            const players = data.data;
+
+            document.getElementById('stat-total-players').textContent = players.length;
+
+            const ranking = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+
+            if (ranking.length > 0) {
+                const best = ranking[0];
+                document.getElementById('stat-best-player').textContent = best.name.substring(0, 15);
+                document.getElementById('stat-best-score').textContent = `Score: ${(best.score || 0).toFixed(1)}`;
+
+                displayBestPlayer(best);
+            }
+
+            displayTopPlayers(ranking.slice(0, 5));
+        }
+    } catch (error) {
+        console.error('Erro ao carregar dashboard:', error);
+    }
+}
+
+function displayBestPlayer(player) {
+    const container = document.getElementById('best-player-content');
+    container.innerHTML = `
+        <div class="best-player-name">${player.name}</div>
+        <div class="best-player-stars">${getStarEmoji(player.stars)}</div>
+        <div class="best-player-stats">
+            <div class="stat-item">
+                <div class="stat-item-label">Score</div>
+                <div class="stat-item-value">${(player.score || 0).toFixed(1)}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">KDR</div>
+                <div class="stat-item-value">${(player.KDR || 0).toFixed(2)}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">ADR</div>
+                <div class="stat-item-value">${(player.ADR || 0).toFixed(1)}</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-item-label">KAST</div>
+                <div class="stat-item-value">${(player.KAST || 0).toFixed(1)}%</div>
+            </div>
+        </div>
+    `;
+}
+
+function displayTopPlayers(players) {
+    const container = document.getElementById('top-players-list');
+
+    if (!players || players.length === 0) {
+        container.innerHTML = '<div class="empty-state">Sem dados</div>';
+        return;
+    }
+
+    container.innerHTML = players.map((player, idx) => `
+        <div class="player-row">
+            <div class="player-rank">${idx + 1}</div>
+            <div class="player-info">
+                <div class="player-name">${player.name}</div>
+                <div class="player-stats">${getStarEmoji(player.stars)} • KDR: ${(player.KDR || 0).toFixed(2)}</div>
+            </div>
+            <div class="player-score">${(player.score || 0).toFixed(1)}</div>
+        </div>
+    `).join('');
 }
 
 async function loadRanking() {
     const container = document.getElementById('ranking-list');
-
-    if (!container) return;
-
-    container.innerHTML = '<div class="skeleton-loader"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
+    container.innerHTML = '<div class="empty-state">Carregando...</div>';
 
     try {
         const response = await fetch(`${API_BASE}/ranking`);
         const data = await response.json();
 
         if (data.success && data.data && data.data.length > 0) {
-            container.innerHTML = data.data.map((player, index) => `
-                <div class="rank-item rank-${Math.min(index + 1, 3)}">
-                    <div class="rank-position">${getPositionEmoji(index + 1)}</div>
-                    <div class="rank-info">
-                        <div class="rank-name">
-                            <span class="star-rating">${getStarEmoji(player.stars)}</span>
-                            ${player.name}
-                        </div>
-                        <div class="rank-stats">
-                            <span>🎯 KDR: ${(player.KDR || 0).toFixed(2)}</span>
-                            <span>💥 ADR: ${(player.ADR || 0).toFixed(1)}</span>
-                            <span>📊 KAST: ${(player.KAST || 0).toFixed(1)}%</span>
-                            <span>📈 Score: ${(player.score || 0).toFixed(1)}</span>
+            container.innerHTML = data.data.map((player, idx) => `
+                <div class="ranking-row">
+                    <div class="ranking-position">${getPositionEmoji(idx + 1)}</div>
+                    <div class="ranking-details">
+                        <div class="ranking-name">${player.name}</div>
+                        <div class="ranking-stats">
+                            <span>${getStarEmoji(player.stars)}</span>
+                            <span>KDR: ${(player.KDR || 0).toFixed(2)}</span>
+                            <span>ADR: ${(player.ADR || 0).toFixed(1)}</span>
                         </div>
                     </div>
+                    <div class="ranking-score">${(player.score || 0).toFixed(1)}</div>
                 </div>
             `).join('');
         } else {
-            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">📭 Nenhum jogador registrado ainda</div>';
+            container.innerHTML = '<div class="empty-state">Sem jogadores registrados</div>';
         }
     } catch (error) {
-        console.error('Erro ao carregar ranking:', error);
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: #ff6b6b;">❌ Erro ao carregar ranking</div>';
-    }
-}
-
-async function loadBestPlayer() {
-    const container = document.getElementById('best-player-card');
-
-    if (!container) return;
-
-    container.innerHTML = '<div class="skeleton-card"></div>';
-
-    try {
-        const response = await fetch(`${API_BASE}/best-player`);
-        const data = await response.json();
-
-        if (data.success && data.data) {
-            const player = data.data;
-            container.innerHTML = `
-                <div style="text-align: center;">
-                    <h3>${player.name}</h3>
-                    <div style="font-size: 3em; margin: 20px 0;">${getStarEmoji(player.stars)}</div>
-                    <div class="best-player-stats">
-                        <div class="stat-box">
-                            <div class="stat-label">Score</div>
-                            <div class="stat-value">${(player.score || 0).toFixed(1)}</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">KDR</div>
-                            <div class="stat-value">${(player.KDR || 0).toFixed(2)}</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">ADR</div>
-                            <div class="stat-value">${(player.ADR || 0).toFixed(1)}</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">KAST</div>
-                            <div class="stat-value">${(player.KAST || 0).toFixed(1)}%</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Kills</div>
-                            <div class="stat-value">${player.K || 0}</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">Deaths</div>
-                            <div class="stat-value">${player.D || 0}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else {
-            container.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: var(--text-secondary);">🎮 Sem dados disponíveis</div>';
-        }
-    } catch (error) {
-        console.error('Erro ao carregar best player:', error);
-        container.innerHTML = '<div style="text-align: center; padding: 60px 20px; color: #ff6b6b;">❌ Erro ao carregar</div>';
+        console.error('Erro:', error);
+        container.innerHTML = '<div class="empty-state">Erro ao carregar</div>';
     }
 }
 
 async function loadPlayers() {
     const container = document.getElementById('players-grid');
-
-    if (!container) return;
-
-    container.innerHTML = '<div class="skeleton-grid"><div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div></div>';
+    container.innerHTML = '<div class="empty-state">Carregando...</div>';
 
     if (allPlayers.length === 0) {
         await loadInitialData();
     }
 
     if (allPlayers.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; grid-column: 1/-1; color: var(--text-secondary);">📭 Nenhum jogador registrado</div>';
+        container.innerHTML = '<div class="empty-state">Nenhum jogador registrado</div>';
         return;
     }
 
     container.innerHTML = allPlayers.map(player => `
         <div class="player-card">
-            <div class="player-name">${player.name}</div>
-            <div class="player-stars">${getStarEmoji(player.stars)}</div>
-            <div class="player-stats-mini">
-                <div><strong>Score:</strong> ${(player.score || 0).toFixed(1)}</div>
-                <div><strong>KDR:</strong> ${(player.KDR || 0).toFixed(2)}</div>
-                <div><strong>ADR:</strong> ${(player.ADR || 0).toFixed(1)}</div>
-                <div><strong>KAST:</strong> ${(player.KAST || 0).toFixed(1)}%</div>
-                <div><strong>Kills:</strong> ${player.K || 0}</div>
-                <div><strong>Deaths:</strong> ${player.D || 0}</div>
-                <div><strong>Assists:</strong> ${player.A || 0}</div>
+            <div class="player-card-title">${player.name}</div>
+            <div class="player-card-stars">${getStarEmoji(player.stars)}</div>
+            <div class="player-card-stats">
+                <div class="player-card-stat">
+                    <span class="player-card-stat-label">Score</span>
+                    <span class="player-card-stat-value">${(player.score || 0).toFixed(1)}</span>
+                </div>
+                <div class="player-card-stat">
+                    <span class="player-card-stat-label">KDR</span>
+                    <span class="player-card-stat-value">${(player.KDR || 0).toFixed(2)}</span>
+                </div>
+                <div class="player-card-stat">
+                    <span class="player-card-stat-label">ADR</span>
+                    <span class="player-card-stat-value">${(player.ADR || 0).toFixed(1)}</span>
+                </div>
+                <div class="player-card-stat">
+                    <span class="player-card-stat-label">KAST</span>
+                    <span class="player-card-stat-value">${(player.KAST || 0).toFixed(1)}%</span>
+                </div>
+                <div class="player-card-stat">
+                    <span class="player-card-stat-label">Kills</span>
+                    <span class="player-card-stat-value">${player.K || 0}</span>
+                </div>
+                <div class="player-card-stat">
+                    <span class="player-card-stat-label">Deaths</span>
+                    <span class="player-card-stat-value">${player.D || 0}</span>
+                </div>
             </div>
         </div>
     `).join('');
@@ -186,31 +208,28 @@ async function loadPlayers() {
 
 async function loadPlayersForTeamBuilder() {
     const container = document.getElementById('player-checkboxes');
-
-    if (!container) return;
-
-    container.innerHTML = '<div class="skeleton-grid"><div class="skeleton"></div><div class="skeleton"></div></div>';
+    container.innerHTML = '<div class="empty-state">Carregando...</div>';
 
     if (allPlayers.length === 0) {
         await loadInitialData();
     }
 
     if (allPlayers.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">📭 Nenhum jogador disponível</div>';
+        container.innerHTML = '<div class="empty-state">Nenhum jogador disponível</div>';
         return;
     }
 
     container.innerHTML = allPlayers.map(player => `
-        <label class="player-checkbox">
+        <label class="checkbox-item">
             <input type="checkbox" data-player='${JSON.stringify(player)}' onchange="updateSelectedPlayers()">
-            <span>${player.name} ${getStarEmoji(player.stars)}</span>
+            <span class="checkbox-label">${player.name} ${getStarEmoji(player.stars)}</span>
         </label>
     `).join('');
 }
 
 // ============ TEAM BUILDER ============
 function updateSelectedPlayers() {
-    const checkboxes = document.querySelectorAll('.player-checkbox input:checked');
+    const checkboxes = document.querySelectorAll('.checkbox-item input:checked');
     selectedPlayers = Array.from(checkboxes).map(cb => JSON.parse(cb.dataset.player));
 
     const generateBtn = document.getElementById('generate-teams-btn');
@@ -221,13 +240,9 @@ function updateSelectedPlayers() {
 
 async function generateTeams() {
     if (selectedPlayers.length !== 10) {
-        alert('❌ Selecione exatamente 10 jogadores!');
+        alert('Selecione exatamente 10 jogadores!');
         return;
     }
-
-    const generateBtn = document.getElementById('generate-teams-btn');
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = '<i class="fas fa-spinner"></i> <span>Gerando...</span>';
 
     try {
         const response = await fetch(`${API_BASE}/teams`, {
@@ -240,37 +255,35 @@ async function generateTeams() {
 
         if (data.success && data.data) {
             displayTeams(data.data);
-        } else {
-            alert('❌ Erro ao gerar times');
         }
     } catch (error) {
         console.error('Erro:', error);
-        alert('❌ Erro ao gerar times');
-    } finally {
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-magic"></i> <span>Gerar Times Balanceados</span>';
+        alert('Erro ao gerar times');
     }
 }
 
 function displayTeams(teamsData) {
     const resultDiv = document.getElementById('teams-result');
 
-    const createTeamHTML = (team, teamNumber) => {
-        return team.map((player, idx) => `
-            <div class="team-player">
-                <span>${idx + 1}. ${player.name} ${getStarEmoji(player.stars)}</span>
-                <span>ADR: ${(player.ADR || 0).toFixed(1)}</span>
-            </div>
-        `).join('');
-    };
+    document.getElementById('team-1-value').textContent = `${teamsData.team1_value}⭐`;
+    document.getElementById('team-2-value').textContent = `${teamsData.team2_value}⭐`;
 
-    document.getElementById('team-1-value').textContent = `${teamsData.team1_value} ⭐`;
-    document.getElementById('team-2-value').textContent = `${teamsData.team2_value} ⭐`;
-    document.getElementById('team-1-players').innerHTML = createTeamHTML(teamsData.team1, 1);
-    document.getElementById('team-2-players').innerHTML = createTeamHTML(teamsData.team2, 2);
+    document.getElementById('team-1-players').innerHTML = teamsData.team1.map((p, i) => `
+        <div class="team-player-item">
+            <span class="team-player-name">${i + 1}. ${p.name} ${getStarEmoji(p.stars)}</span>
+            <span class="team-player-adr">ADR: ${(p.ADR || 0).toFixed(1)}</span>
+        </div>
+    `).join('');
+
+    document.getElementById('team-2-players').innerHTML = teamsData.team2.map((p, i) => `
+        <div class="team-player-item">
+            <span class="team-player-name">${i + 1}. ${p.name} ${getStarEmoji(p.stars)}</span>
+            <span class="team-player-adr">ADR: ${(p.ADR || 0).toFixed(1)}</span>
+        </div>
+    `).join('');
 
     resultDiv.style.display = 'grid';
-    resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    resultDiv.scrollIntoView({ behavior: 'smooth' });
 }
 
 // ============ UTILITIES ============
@@ -278,16 +291,9 @@ function getStarEmoji(stars) {
     return '⭐'.repeat(stars || 1);
 }
 
-function getPositionEmoji(position) {
-    switch(position) {
-        case 1: return '🥇';
-        case 2: return '🥈';
-        case 3: return '🥉';
-        default: return position;
-    }
-}
-
-// ============ HELPERS ============
-function formatNumber(num) {
-    return parseFloat(num).toFixed(2);
+function getPositionEmoji(pos) {
+    if (pos === 1) return '🥇';
+    if (pos === 2) return '🥈';
+    if (pos === 3) return '🥉';
+    return pos;
 }
