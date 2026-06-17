@@ -19,15 +19,22 @@ CORS(app, supports_credentials=True)
 
 # ============ FIREBASE ============
 try:
-    cred = credentials.Certificate('firebase-key.json')
+    firebase_key_b64 = os.getenv('FIREBASE_KEY_B64')
+    if firebase_key_b64:
+        import base64, json as _json
+        key_dict = _json.loads(base64.b64decode(firebase_key_b64))
+        cred = credentials.Certificate(key_dict)
+    else:
+        cred = credentials.Certificate('firebase-key.json')
     firebase_admin.initialize_app(cred)
     db = firestore.client()
+    print("✅ Firebase conectado")
 except Exception as e:
     print(f"Firebase init error: {e}")
     db = None
 
 # ============ STEAM CONFIG ============
-STEAM_API_KEY = '1B861D0A148D9A41C119C3592BB49C42'
+STEAM_API_KEY = os.getenv('STEAM_API_KEY', '1B861D0A148D9A41C119C3592BB49C42')
 STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login'
 STEAM_API_BASE = 'https://api.steampowered.com'
 
