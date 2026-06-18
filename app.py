@@ -158,11 +158,43 @@ def get_ranking(period='all'):
             ranking = sorted(players, key=lambda p: p.get('score', 0), reverse=True)
             return jsonify({'success': True, 'data': ranking})
 
-        days = 7 if period == 'weekly' else 30
-        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        all_players = [_clean(doc.to_dict()) for doc in db.collection('players').stream()]
 
-        # Agrega stats das partidas reais do período
-        all_players = {doc.id: _clean(doc.to_dict()) for doc in db.collection('players').stream()}
+        if period == 'monthly':
+            # Usa monthly_stats do player doc — busca o mês mais recente com dados
+            ranking = []
+            for p in all_players:
+                ms = p.get('monthly_stats') or {}
+                if not ms:
+                    continue
+                # Pega o mês mais recente (sort decrescente)
+                latest_period = sorted(ms.keys(), reverse=True)[0]
+                s = ms[latest_period]
+                n = s.get('matches', 1) or 1
+                entry = {
+                    **p,
+                    'period':         latest_period,
+                    'period_matches': s.get('matches', 0),
+                    'period_wins':    s.get('wins', 0),
+                    'win_rate':       s.get('win_rate', 0),
+                    'avg_rating':     s.get('avg_rating', 0),
+                    'KDR':            s.get('KDR', p.get('KDR', 0)),
+                    'ADR':            s.get('ADR', p.get('ADR', 0)),
+                }
+                # Recalcula score/estrelas com os dados do mês
+                from backend.utils.star_calculator import calculate_player_stars
+                month_stars = calculate_player_stars(entry)
+                entry.update(month_stars)
+                ranking.append(entry)
+
+            # Jogadores sem monthly_stats ficam de fora (não jogaram no período)
+            ranking.sort(key=lambda p: (p.get('KDR', 0), p.get('win_rate', 0)), reverse=True)
+            return jsonify({'success': True, 'data': ranking, 'period': period})
+
+        # Ranking semanal — agrega partidas dos últimos 7 dias
+        days = 7
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        all_players_map = {p['name']: p for p in all_players if p.get('name')}
         player_agg = {}
 
         for doc in db.collection('matches').stream():
@@ -188,14 +220,12 @@ def get_ranking(period='all'):
                 s = doc.to_dict()
                 if s.get('snapshot_date', '') >= cutoff:
                     pname = s.get('player_name', '')
-                    if not pname:
-                        continue
-                    if pname not in player_agg:
+                    if pname and pname not in player_agg:
                         player_agg[pname] = {'matches': 0, 'wins': 0, 'total_rating': float(s.get('score', 0)), 'maps': []}
 
         ranking = []
         for pname, agg in player_agg.items():
-            base = all_players.get(pname, {'name': pname})
+            base = all_players_map.get(pname, {'name': pname})
             n = agg['matches'] or 1
             entry = {
                 **base,
@@ -397,19 +427,15 @@ def gc_import_player():
         gc_data   = import_player(raw)
         name      = gc_data.get('name', f"Player_{gc_data.get('gc_player_id', 'unknown')}")
 
-        # Remove campos de debug/temp antes de salvar no Firestore
-        last_matches   = gc_data.pop('last_matches', [])
-        matches_sample = gc_data.pop('_matches_sample', None)
-        matches_type   = gc_data.pop('_matches_type', None)
-        matches_keys   = gc_data.pop('_matches_keys', None)
-        gc_data.pop('available_months', None)
-        gc_data.pop('history_endpoint', None)
+        # Remove campos temp antes de salvar no Firestore
+        last_matches = gc_data.pop('last_matches', [])
 
-        # Loga estrutura dos matches para análise mensal
-        if matches_sample is not None:
-            print(f"[import] matches é LISTA — sample[0]: {str(matches_sample[0])[:300]}")
-        if matches_type == 'dict':
-            print(f"[import] matches é DICT — keys: {matches_keys}")
+        monthly_stats = gc_data.get('monthly_stats', {})
+        monthly_count = len(monthly_stats)
+        if monthly_stats:
+            print(f"[import] {name} | monthly_stats períodos: {list(monthly_stats.keys())}")
+            for period, s in monthly_stats.items():
+                print(f"[import]   {period}: {s}")
 
         star_info = calculate_player_stars(gc_data)
         gc_data.update(star_info)
@@ -425,25 +451,11 @@ def gc_import_player():
         # Salva partidas individuais para ranking semanal/mensal
         _save_matches(name, last_matches)
 
-        monthly = gc_data.get('monthly_stats', [])
-        monthly_count = len(monthly)
-        history_endpoint = gc_data.get('history_endpoint', '')
-
-        # Retorna chaves do primeiro mês para debug do mapeamento
-        first_month_keys = None
-        if monthly:
-            first_month_keys = ','.join(monthly[0].get('_raw_keys', []))
-            # Mostra no log do Render
-            print(f"[import] {name} | monthly={monthly_count} | primeiro mês keys: {first_month_keys}")
-            print(f"[import] {name} | primeiro mês valores: {monthly[0]}")
-
         return jsonify({
             'success': True,
             'player': name,
             'matches_saved': len(last_matches),
             'monthly_periods': monthly_count,
-            'history_endpoint': history_endpoint or None,
-            'first_month_keys': first_month_keys,
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

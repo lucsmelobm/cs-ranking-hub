@@ -308,7 +308,83 @@ def import_player(raw_data):
         # Recalcula DIFF com os novos K e D
         result["DIFF"] = result.get("K", 0) - result.get("D", 0)
 
+    # Stats mensais via ?month= — monthMatches é lista de partidas de cada mês
+    monthly_raw = raw_data.get("_monthly_data") or {}
+    if isinstance(monthly_raw, dict) and monthly_raw:
+        monthly_stats = {}
+        for period, matches in monthly_raw.items():
+            if not isinstance(matches, list) or not matches:
+                continue
+            monthly_stats[period] = _aggregate_month_matches(matches)
+        if monthly_stats:
+            result["monthly_stats"] = monthly_stats
+
     return result
+
+
+def _safe_get(d, *keys, default=0.0):
+    for k in keys:
+        v = d.get(k)
+        if v is not None:
+            return _safe_float(v, default)
+    return default
+
+
+def _aggregate_month_matches(matches):
+    """Agrega lista de partidas de um mês em stats consolidadas."""
+    total = len(matches)
+    if total == 0:
+        return {}
+
+    wins = 0
+    sum_rating = 0.0
+    sum_kills   = 0
+    sum_deaths  = 0
+    sum_assists = 0
+    sum_adr     = 0.0
+    sum_hs      = 0.0
+    has_adr = has_hs = False
+
+    for m in matches:
+        if not isinstance(m, dict):
+            continue
+        # Win
+        won = m.get("win") or m.get("victory") or m.get("won") or False
+        if won:
+            wins += 1
+        # Rating (HLTV-style do GamersClub)
+        sum_rating += _safe_get(m, "ratingPlayer", "rating", "ratingP", "rate", default=0.0)
+        # K/D/A por partida
+        sum_kills   += int(_safe_get(m, "kill",   "kills",   "k", "K",   default=0))
+        sum_deaths  += int(_safe_get(m, "death",  "deaths",  "d", "D",   default=0))
+        sum_assists += int(_safe_get(m, "assist", "assists", "a", "A",   default=0))
+        # ADR e HS% — podem não estar presentes por partida
+        adr_val = _safe_get(m, "adr", "ADR", "damage", "damagePerRound", default=-1.0)
+        if adr_val >= 0:
+            sum_adr += adr_val
+            has_adr  = True
+        hs_val = _safe_get(m, "hs", "HS", "headshotPercent", "headshot", default=-1.0)
+        if hs_val >= 0:
+            sum_hs += hs_val
+            has_hs  = True
+
+    kdr = round(sum_kills / sum_deaths, 2) if sum_deaths > 0 else round(sum_kills, 2)
+    agg = {
+        "matches":   total,
+        "wins":      wins,
+        "losses":    total - wins,
+        "win_rate":  round(wins / total * 100, 1),
+        "kills":     sum_kills,
+        "deaths":    sum_deaths,
+        "assists":   sum_assists,
+        "KDR":       kdr,
+        "avg_rating": round(sum_rating / total, 2),
+    }
+    if has_adr:
+        agg["ADR"] = round(sum_adr / total, 1)
+    if has_hs:
+        agg["HS"]  = round(sum_hs  / total, 1)
+    return agg
 
 
 def get_team(team_id):

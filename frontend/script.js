@@ -472,15 +472,7 @@ function initBookmarklet() {
     .then(function(results) {
       var data = results[0];
       var hist = results[1];
-
       var localMonths = (hist && Array.isArray(hist.months)) ? hist.months : [];
-      var localCount  = localMonths.length;
-
-      // Estatísticas de W/L do campo matches (dict)
-      var winInfo = '';
-      if (hist && hist.matches && typeof hist.matches === 'object' && !Array.isArray(hist.matches)) {
-        winInfo = 'W:' + hist.matches.wins + ' L:' + hist.matches.loss + ' Total:' + hist.matches.matches;
-      }
 
       data.avatar = findAvatar(data);
       if (hist) {
@@ -488,47 +480,40 @@ function initBookmarklet() {
         data._history_data = hist;
       }
 
-      // Proba mês atual e mês anterior para ver qual tem monthMatches populado
-      var month0 = localMonths[0] || '';
-      var month1 = localMonths[1] || '';
-      var fetchMonth = function(m) {
-        return m ? fetch('/api/box/history/' + id + '?month=' + m, {credentials:'include'}).then(function(r){ return r.json(); }).catch(function(){ return null; }) : Promise.resolve(null);
-      };
-      var monthProbe = Promise.all([fetchMonth(month0), fetchMonth(month1)]);
+      // Busca os últimos 3 meses com dados (pula o mês atual que fica vazio)
+      // months[0] = mês atual (vazio), months[1..3] = meses anteriores completos
+      var monthsToFetch = localMonths.slice(1, 4);
+      return Promise.all(
+        monthsToFetch.map(function(m) {
+          return fetch('/api/box/history/' + id + '?month=' + m, {credentials:'include'})
+            .then(function(r){ return r.json(); })
+            .then(function(d){ return {month: m, data: d}; })
+            .catch(function(){ return {month: m, data: null}; });
+        })
+      ).then(function(monthResults) {
+        // Monta dicionário de dados mensais para enviar ao backend
+        var monthlyData = {};
+        monthResults.forEach(function(item) {
+          if (item.data && item.data.monthMatches) {
+            monthlyData[item.month] = item.data.monthMatches;
+          }
+        });
+        data._monthly_data = monthlyData;
 
-      return Promise.all([
-        fetch('${backendUrl}/api/gamersclub/import', {
+        return fetch('${backendUrl}/api/gamersclub/import', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify(data)
-        }).then(function(r){ return r.json(); }),
-        monthProbe
-      ]).then(function(r2){
-        var r    = r2[0];
-        var mArr = r2[1]; // [month0data, month1data]
-        if (r.success) {
-          var msg = '\\u2705 ' + r.player + ' sincronizado!';
-          msg += '\\n\\uD83C\\uDFC6 ' + winInfo;
-          msg += '\\n\\uD83D\\uDCC5 Meses: ' + localCount + ' (' + localMonths.slice(0,3).join(', ') + ')';
-          function describeMonth(label, md) {
-            if (!md) return '\\n' + label + ': sem resposta';
-            var mm = md.monthMatches;
-            if (mm === undefined || mm === null) return '\\n' + label + ' sem monthMatches';
-            if (Array.isArray(mm)) {
-              var s = '\\n' + label + ' LISTA[' + mm.length + ']';
-              if (mm.length > 0) s += ': ' + (JSON.stringify(mm[0]) || 'vazio').substring(0, 300);
-              return s;
-            }
-            if (typeof mm === 'object') {
-              var ks = Object.keys(mm);
-              return '\\n' + label + ' DICT keys: ' + ks.slice(0,8).join(',') + (ks.length > 0 ? ' v0:' + (JSON.stringify(mm[ks[0]]) || '').substring(0,150) : '');
-            }
-            return '\\n' + label + ': ' + String(mm).substring(0,100);
+        }).then(function(r){ return r.json(); }).then(function(r){
+          if (r.success) {
+            var mcount = Object.keys(monthlyData).length;
+            var msg = '\\u2705 ' + r.player + ' sincronizado!';
+            if (mcount > 0) msg += '\\n\\uD83D\\uDCC5 ' + mcount + ' meses de hist\\u00F3rico salvos';
+            alert(msg);
+          } else {
+            alert('\\u274c Erro: ' + r.error);
           }
-          msg += describeMonth(month0, mArr[0]);
-          msg += describeMonth(month1, mArr[1]);
-          alert(msg);
-        } else alert('\\u274c Erro: ' + r.error);
+        });
       });
     })
     .catch(function(e){ alert('\\u274c Erro: ' + e.message); });
