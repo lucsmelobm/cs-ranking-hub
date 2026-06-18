@@ -21,6 +21,8 @@ _STAT_MAP = {
     "Assists":           "A",
     "Bombas Plantadas":  "bombs_planted",
     "Bombas Defusadas":  "bombs_defused",
+    "Bombas pla.":       "bombs_planted",
+    "Bombas def.":       "bombs_defused",
     "Multi kills":       "MK",
     "Primeiro a matar":  "FK",
     "Headshot%":         "HS",
@@ -289,22 +291,22 @@ def import_player(raw_data):
                 if field:
                     result[field] = _safe_float(value)
 
-        # Lista de meses disponíveis
-        months_list = history_raw.get("months", [])
-        if months_list:
-            result["available_months"] = months_list
-            result["history_endpoint"] = history_url
+        # Totais de W/L do campo "matches" (dict com wins/loss/matches)
+        hist_matches_raw = history_raw.get("matches", {})
+        if isinstance(hist_matches_raw, dict):
+            total_wins    = int(_safe_float(hist_matches_raw.get("wins",    0)))
+            total_losses  = int(_safe_float(hist_matches_raw.get("loss",    0)))
+            total_matches = int(_safe_float(hist_matches_raw.get("matches", 0)))
+            result["total_wins"]    = total_wins
+            result["total_losses"]  = total_losses
+            result["total_matches"] = total_matches
+            if total_matches > 0:
+                result["win_rate"] = round(total_wins / total_matches * 100, 1)
+            else:
+                result["win_rate"] = 0.0
 
         # Recalcula DIFF com os novos K e D
         result["DIFF"] = result.get("K", 0) - result.get("D", 0)
-
-        # Guarda estrutura dos matches para investigar formato
-        hist_matches_raw = history_raw.get("matches", [])
-        if isinstance(hist_matches_raw, list) and hist_matches_raw:
-            result["_matches_sample"] = hist_matches_raw[:2]
-        elif isinstance(hist_matches_raw, dict):
-            result["_matches_type"] = "dict"
-            result["_matches_keys"] = list(hist_matches_raw.keys())[:10]
 
     return result
 

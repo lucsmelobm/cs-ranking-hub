@@ -207,7 +207,8 @@ function renderPlayers(list) {
             ${stat('KAST',  fmt(p.KAST, 0) + '%')}
             ${stat('Kills', p.K ?? 0)}
             ${stat('Deaths', p.D ?? 0)}
-            ${stat('Assists', p.A ?? 0)}
+            ${p.win_rate != null ? stat('Win%', fmt(p.win_rate, 1) + '%') : ''}
+            ${p.total_matches ? stat('Partidas', p.total_matches) : ''}
           </div>
           ${isAdmin ? `<button class="btn-delete" onclick="confirmDelete('${escJs(p.name)}')">🗑️ Remover</button>` : ''}
         </div>`).join('')
@@ -472,29 +473,14 @@ function initBookmarklet() {
       var data = results[0];
       var hist = results[1];
 
-      // Debug: ver estrutura de matches (pode ser lista ou dict)
       var localMonths = (hist && Array.isArray(hist.months)) ? hist.months : [];
       var localCount  = localMonths.length;
-      var firstSample = '';
-      if (hist && hist.matches) {
-        if (Array.isArray(hist.matches)) {
-          firstSample += 'matches LISTA count: ' + hist.matches.length + '\\n';
-          firstSample += 'matches[0]: ' + (JSON.stringify(hist.matches[0]) || 'vazio').substring(0, 300) + '\\n';
-        } else if (typeof hist.matches === 'object') {
-          var mkeys = Object.keys(hist.matches);
-          firstSample += 'matches DICT keys(' + mkeys.length + '): ' + mkeys.slice(0,8).join(', ') + '\\n';
-          var firstKey = mkeys[0];
-          if (firstKey) {
-            firstSample += 'matches["' + firstKey + '"]: ' + (JSON.stringify(hist.matches[firstKey]) || '').substring(0, 300) + '\\n';
-          }
-        } else {
-          firstSample += 'matches tipo: ' + typeof hist.matches + '\\n';
-        }
-      } else {
-        firstSample += 'matches: ausente\\n';
+
+      // Estatísticas de W/L do campo matches (dict)
+      var winInfo = '';
+      if (hist && hist.matches && typeof hist.matches === 'object' && !Array.isArray(hist.matches)) {
+        winInfo = 'W:' + hist.matches.wins + ' L:' + hist.matches.loss + ' Total:' + hist.matches.matches;
       }
-      firstSample += 'stat: ' + (JSON.stringify(hist && hist.stat) || 'null').substring(0, 300);
-      var firstKeys = 'ver Dados abaixo';
 
       data.avatar = findAvatar(data);
       if (hist) {
@@ -502,16 +488,37 @@ function initBookmarklet() {
         data._history_data = hist;
       }
 
-      return fetch('${backendUrl}/api/gamersclub/import', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-      }).then(function(r){ return r.json(); }).then(function(r){
+      // Proba endpoint de stats por mês (para investigar estrutura)
+      var mostRecentMonth = localMonths[0] || '';
+      var monthProbe = mostRecentMonth
+        ? fetch('/api/box/history/' + id + '?month=' + mostRecentMonth, {credentials:'include'}).then(function(r){ return r.json(); }).catch(function(){ return null; })
+        : Promise.resolve(null);
+
+      return Promise.all([
+        fetch('${backendUrl}/api/gamersclub/import', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data)
+        }).then(function(r){ return r.json(); }),
+        monthProbe
+      ]).then(function(r2){
+        var r = r2[0];
+        var monthData = r2[1];
         if (r.success) {
           var msg = '\\u2705 ' + r.player + ' sincronizado!';
-          msg += '\\n\\uD83D\\uDCC5 Meses capturados (cliente): ' + localCount;
-          msg += '\\nCampos do 1\\u00BA m\\u00EAs: ' + firstKeys;
-          if (firstSample) msg += '\\nDados: ' + firstSample;
+          msg += '\\n\\uD83C\\uDFC6 ' + winInfo;
+          msg += '\\n\\uD83D\\uDCC5 Meses: ' + localCount + ' (' + localMonths.slice(0,3).join(', ') + ')';
+          if (monthData) {
+            var monthKeys = Object.keys(monthData);
+            msg += '\\n\\uD83D\\uDD0D ?month=' + mostRecentMonth + ' keys: ' + monthKeys.join(',');
+            // Se retornou stat diferente do histórico geral, há dados por mês!
+            var mstat = monthData.stat;
+            if (mstat && Array.isArray(mstat)) {
+              msg += '\\nstat[0]: ' + JSON.stringify(mstat[0]).substring(0,100);
+            }
+          } else {
+            msg += '\\n?month= sem resposta';
+          }
           alert(msg);
         } else alert('\\u274c Erro: ' + r.error);
       });
