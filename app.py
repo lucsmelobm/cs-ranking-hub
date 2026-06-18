@@ -191,54 +191,28 @@ def get_ranking(period='all'):
             ranking.sort(key=lambda p: (p.get('KDR', 0), p.get('win_rate', 0)), reverse=True)
             return jsonify({'success': True, 'data': ranking, 'period': period})
 
-        # Ranking semanal — agrega partidas dos últimos 7 dias
-        days = 7
-        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-        all_players_map = {p['name']: p for p in all_players if p.get('name')}
-        player_agg = {}
-
-        for doc in db.collection('matches').stream():
-            m = doc.to_dict()
-            match_date = m.get('date', '')
-            if not match_date or match_date < cutoff:
-                continue
-            pname = m.get('player_name', '')
-            if not pname:
-                continue
-            if pname not in player_agg:
-                player_agg[pname] = {'matches': 0, 'wins': 0, 'total_rating': 0.0, 'maps': []}
-            player_agg[pname]['matches'] += 1
-            if m.get('win'):
-                player_agg[pname]['wins'] += 1
-            player_agg[pname]['total_rating'] += float(m.get('rating', 0))
-            if m.get('map'):
-                player_agg[pname]['maps'].append(m['map'])
-
-        if not player_agg:
-            # Fallback para snapshots se não houver partidas com data
-            for doc in db.collection('snapshots').stream():
-                s = doc.to_dict()
-                if s.get('snapshot_date', '') >= cutoff:
-                    pname = s.get('player_name', '')
-                    if pname and pname not in player_agg:
-                        player_agg[pname] = {'matches': 0, 'wins': 0, 'total_rating': float(s.get('score', 0)), 'maps': []}
-
+        # Ranking semanal — usa stats atuais dos jogadores sincronizados na semana
+        cutoff_dt = datetime.now(tz=timezone.utc) - timedelta(days=7)
         ranking = []
-        for pname, agg in player_agg.items():
-            base = all_players_map.get(pname, {'name': pname})
-            n = agg['matches'] or 1
-            entry = {
-                **base,
-                'period_matches': agg['matches'],
-                'period_wins':    agg['wins'],
-                'win_rate':       round(agg['wins'] / n * 100, 1),
-                'avg_rating':     round(agg['total_rating'] / n, 2),
-                'top_map':        max(set(agg['maps']), key=agg['maps'].count) if agg['maps'] else '',
-            }
-            ranking.append(entry)
-
-        ranking.sort(key=lambda p: (p['period_matches'], p.get('avg_rating', 0)), reverse=True)
-        return jsonify({'success': True, 'data': ranking, 'period': period, 'days': days})
+        for p in all_players:
+            updated = p.get('updated_at', '')
+            try:
+                upd_dt = datetime.fromisoformat(updated)
+                if upd_dt.tzinfo is None:
+                    from datetime import timezone as tz_
+                    upd_dt = upd_dt.replace(tzinfo=tz_.utc)
+                if upd_dt < cutoff_dt:
+                    continue
+            except Exception:
+                pass  # inclui jogadores sem updated_at válido
+            ranking.append({
+                **p,
+                'period_matches': p.get('total_matches', 0),
+                'win_rate':       p.get('win_rate', 0),
+                'avg_rating':     p.get('score', 0),
+            })
+        ranking.sort(key=lambda p: p.get('score', 0), reverse=True)
+        return jsonify({'success': True, 'data': ranking, 'period': period})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -292,13 +266,12 @@ def get_best_player():
 
 @app.route('/api/player/<path:name>/avatar', methods=['PATCH'])
 def update_avatar(name):
-    """Atualiza só o avatar de um jogador (chamado pelo bookmarklet de avatar)."""
     if not db:
         return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
     data = request.get_json() or {}
+    if not ADMIN_PASSWORD or data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 401
     avatar = data.get('avatar', '')
-    if not avatar:
-        return jsonify({'success': False, 'error': 'Avatar vazio'}), 400
     try:
         db.collection('players').document(name).update({'avatar': avatar})
         return jsonify({'success': True, 'player': name, 'avatar': avatar})

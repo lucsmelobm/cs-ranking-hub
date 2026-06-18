@@ -214,7 +214,11 @@ function renderPlayers(list) {
             ${p.win_rate != null ? stat('Win%', fmt(p.win_rate, 1) + '%') : ''}
             ${p.total_matches ? stat('Partidas', p.total_matches) : ''}
           </div>
-          ${isAdmin ? `<button class="btn-delete" onclick="confirmDelete('${escJs(p.name)}')">🗑️ Remover</button>` : ''}
+          ${isAdmin ? `
+          <div class="pc-admin-btns">
+            <button class="btn-avatar-edit" onclick="editAvatar('${escJs(p.name)}')"><i class="fas fa-camera"></i> Foto</button>
+            <button class="btn-delete" onclick="confirmDelete('${escJs(p.name)}')">🗑️ Remover</button>
+          </div>` : ''}
         </div>`).join('')
     : '<div class="empty-msg">Nenhum jogador encontrado</div>';
 }
@@ -222,6 +226,22 @@ function renderPlayers(list) {
 function filterPlayers(q) {
   const filtered = players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
   renderPlayers(filtered);
+}
+
+async function editAvatar(name) {
+  const url = prompt(`Cole a URL da foto para ${name}:\n(deixe em branco para remover)`, '');
+  if (url === null) return;
+  const pwd = sessionStorage.getItem('avance_pwd');
+  if (!pwd) return toast('Faça login primeiro', 'error');
+  try {
+    const res  = await fetch(`${API}/player/${encodeURIComponent(name)}/avatar`, {
+      method: 'PATCH', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ avatar: url.trim(), password: pwd })
+    });
+    const json = await res.json();
+    if (json.success) { toast('Foto atualizada!'); await fetchPlayers(); renderPlayers(players); }
+    else toast('Erro: ' + json.error, 'error');
+  } catch { toast('Erro de conexão', 'error'); }
 }
 
 /* ─── DELETE ──────────────────────────────── */
@@ -356,6 +376,27 @@ function showTeams(data) {
 
   qs('#teams-result').style.display = 'grid';
   qs('#teams-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  const copyBtn = qs('#copy-teams-btn');
+  if (copyBtn) {
+    copyBtn.style.display = 'inline-flex';
+    copyBtn.onclick = () => {
+      const t1 = data.team1.map((p, i) => `${i+1}. ${p.name}`).join('\n');
+      const t2 = data.team2.map((p, i) => `${i+1}. ${p.name}`).join('\n');
+      const text = `🔴 TIME 1 (${data.team1_value}⭐)\n${t1}\n\n🔵 TIME 2 (${data.team2_value}⭐)\n${t2}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => toast('Times copiados!')).catch(() => fallbackCopy(text));
+      } else fallbackCopy(text);
+    };
+  }
+}
+
+function fallbackCopy(text) {
+  const el = document.createElement('textarea');
+  el.value = text; el.style.position = 'fixed'; el.style.opacity = '0';
+  document.body.appendChild(el); el.select();
+  try { document.execCommand('copy'); toast('Times copiados!'); } catch { toast('Erro ao copiar', 'error'); }
+  document.body.removeChild(el);
 }
 
 /* ─── AUTH ────────────────────────────────── */
