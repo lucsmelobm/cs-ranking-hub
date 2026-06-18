@@ -20,6 +20,18 @@
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
+  <!-- Password modal -->
+  <div id="auth-overlay" class="auth-overlay" style="display:none">
+    <div class="auth-modal glass-card">
+      <div class="auth-icon">🔒</div>
+      <h2 class="auth-title">Área Restrita</h2>
+      <p class="auth-sub">Digite a senha para acessar</p>
+      <input id="auth-input" class="auth-input" type="password" placeholder="Senha..." />
+      <button id="auth-btn" class="btn-primary" style="margin-top:12px">Entrar</button>
+      <p id="auth-error" class="auth-error" style="display:none">Senha incorreta</p>
+    </div>
+  </div>
+
   <!-- Header -->
   <header class="header">
     <div class="header-inner">

@@ -54,9 +54,20 @@ except Exception as e:
 def index():
     return send_from_directory('frontend', 'index.html')
 
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', '')
+
 @app.route('/api/status', methods=['GET'])
 def status():
     return jsonify({'firebase': db is not None, 'firebase_error': _firebase_error, 'status': 'ok'})
+
+@app.route('/api/auth', methods=['POST'])
+def auth():
+    data = request.get_json()
+    if not ADMIN_PASSWORD:
+        return jsonify({'success': False, 'error': 'ADMIN_PASSWORD não configurado no servidor'}), 500
+    if data.get('password') == ADMIN_PASSWORD:
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Senha incorreta'}), 401
 
 # ============ PLAYERS API ============
 @app.route('/api/players', methods=['GET'])

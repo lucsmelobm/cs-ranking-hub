@@ -32,7 +32,7 @@ function initNav() {
       if (tab === 'ranking') renderRanking();
       if (tab === 'players') renderPlayers(players);
       if (tab === 'teams')   renderPickGrid();
-      if (tab === 'sync')    renderSync();
+      if (tab === 'sync')    requireAuth(renderSync);
     });
   });
 }
@@ -244,6 +244,52 @@ function showTeams(data) {
 
   qs('#teams-result').style.display = 'grid';
   qs('#teams-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ─── AUTH ────────────────────────────────── */
+function requireAuth(onSuccess) {
+  if (sessionStorage.getItem('avance_auth') === '1') { onSuccess(); return; }
+
+  const overlay = document.getElementById('auth-overlay');
+  const input   = document.getElementById('auth-input');
+  const btn     = document.getElementById('auth-btn');
+  const err     = document.getElementById('auth-error');
+
+  overlay.style.display = 'flex';
+  input.value = '';
+  err.style.display = 'none';
+  setTimeout(() => input.focus(), 100);
+
+  const attempt = async () => {
+    const pwd = input.value.trim();
+    if (!pwd) return;
+    btn.disabled = true;
+    try {
+      const res  = await fetch(`${API}/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd })
+      });
+      const json = await res.json();
+      if (json.success) {
+        sessionStorage.setItem('avance_auth', '1');
+        overlay.style.display = 'none';
+        onSuccess();
+      } else {
+        err.style.display = 'block';
+        input.value = '';
+        input.focus();
+      }
+    } catch {
+      err.textContent = 'Erro de conexão';
+      err.style.display = 'block';
+    }
+    btn.disabled = false;
+  };
+
+  btn.onclick = attempt;
+  input.onkeydown = e => { if (e.key === 'Enter') attempt(); };
+  overlay.onclick = e => { if (e.target === overlay) overlay.style.display = 'none'; };
 }
 
 /* ─── BOOKMARKLET ─────────────────────────── */
