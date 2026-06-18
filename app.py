@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 sys.path.insert(0, 'backend')
 from utils.star_calculator import calculate_player_stars
 from utils.team_balancer import balance_teams
+from utils.gamersclub_scraper import get_player, get_team, get_player_matches
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 app.secret_key = 'cs-ranking-hub-secret-key-2024'
@@ -261,6 +262,99 @@ def generate_teams():
         return jsonify({'success': True, 'data': balanced})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============ GAMERSCLUB API ============
+
+@app.route('/api/gamersclub/player/<player_id>', methods=['GET'])
+def gc_get_player(player_id):
+    """Busca dados brutos de um jogador no GamersClub."""
+    try:
+        data = get_player(player_id)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/gamersclub/sync-player', methods=['POST'])
+def gc_sync_player():
+    """
+    Busca stats de um jogador no GamersClub e salva no Firestore.
+    Body: { "gc_player_id": "123", "name": "NomeOptional" }
+    """
+    try:
+        body        = request.get_json()
+        player_id   = body.get('gc_player_id') or body.get('player_id')
+        custom_name = body.get('name')
+
+        if not player_id:
+            return jsonify({'success': False, 'error': 'gc_player_id obrigatório'}), 400
+
+        gc_data = get_player(player_id)
+
+        if custom_name:
+            gc_data['name'] = custom_name
+
+        name = gc_data.get('name', f'Player_{player_id}')
+
+        star_info = calculate_player_stars(gc_data)
+        gc_data.update(star_info)
+        gc_data['updated_at'] = datetime.now()
+        gc_data['source'] = 'gamersclub'
+
+        if db:
+            db.collection('players').document(name).set(gc_data)
+
+        return jsonify({'success': True, 'data': gc_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/gamersclub/sync-team', methods=['POST'])
+def gc_sync_team():
+    """
+    Busca todos os jogadores de um time no GamersClub e salva cada um no Firestore.
+    Body: { "gc_team_id": "456" }
+    """
+    try:
+        body    = request.get_json()
+        team_id = body.get('gc_team_id') or body.get('team_id')
+
+        if not team_id:
+            return jsonify({'success': False, 'error': 'gc_team_id obrigatório'}), 400
+
+        team    = get_team(team_id)
+        results = []
+
+        for p in team.get('players', []):
+            try:
+                gc_data   = get_player(p['gc_player_id'])
+                name      = gc_data.get('name', f"Player_{p['gc_player_id']}")
+                star_info = calculate_player_stars(gc_data)
+                gc_data.update(star_info)
+                gc_data['updated_at'] = datetime.now()
+                gc_data['source']     = 'gamersclub'
+
+                if db:
+                    db.collection('players').document(name).set(gc_data)
+
+                results.append({'player': name, 'status': 'ok'})
+            except Exception as pe:
+                results.append({'player': p['gc_player_id'], 'status': 'error', 'error': str(pe)})
+
+        return jsonify({'success': True, 'synced': len(results), 'results': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/gamersclub/matches/<player_id>', methods=['GET'])
+def gc_player_matches(player_id):
+    """Retorna histórico de partidas de um jogador no GamersClub."""
+    try:
+        matches = get_player_matches(player_id)
+        return jsonify({'success': True, 'data': matches})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ============ ADMIN API ============
 @app.route('/api/sync-now', methods=['POST'])
