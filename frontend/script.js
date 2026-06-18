@@ -472,14 +472,28 @@ function initBookmarklet() {
       var data = results[0];
       var hist = results[1];
 
-      // Debug: ver matches[0] e endpoint por mês
+      // Debug: ver estrutura de matches (pode ser lista ou dict)
       var localMonths = (hist && Array.isArray(hist.months)) ? hist.months : [];
       var localCount  = localMonths.length;
-      var histMatches = (hist && Array.isArray(hist.matches)) ? hist.matches : [];
       var firstSample = '';
-      firstSample += 'matches count: ' + histMatches.length + '\\n';
-      firstSample += 'matches[0]: ' + (JSON.stringify(histMatches[0]) || 'undefined').substring(0, 250) + '\\n';
-      firstSample += 'stat completo: ' + (JSON.stringify(hist && hist.stat) || 'null').substring(0, 300);
+      if (hist && hist.matches) {
+        if (Array.isArray(hist.matches)) {
+          firstSample += 'matches LISTA count: ' + hist.matches.length + '\\n';
+          firstSample += 'matches[0]: ' + (JSON.stringify(hist.matches[0]) || 'vazio').substring(0, 300) + '\\n';
+        } else if (typeof hist.matches === 'object') {
+          var mkeys = Object.keys(hist.matches);
+          firstSample += 'matches DICT keys(' + mkeys.length + '): ' + mkeys.slice(0,8).join(', ') + '\\n';
+          var firstKey = mkeys[0];
+          if (firstKey) {
+            firstSample += 'matches["' + firstKey + '"]: ' + (JSON.stringify(hist.matches[firstKey]) || '').substring(0, 300) + '\\n';
+          }
+        } else {
+          firstSample += 'matches tipo: ' + typeof hist.matches + '\\n';
+        }
+      } else {
+        firstSample += 'matches: ausente\\n';
+      }
+      firstSample += 'stat: ' + (JSON.stringify(hist && hist.stat) || 'null').substring(0, 300);
       var firstKeys = 'ver Dados abaixo';
 
       data.avatar = findAvatar(data);

@@ -397,8 +397,19 @@ def gc_import_player():
         gc_data   = import_player(raw)
         name      = gc_data.get('name', f"Player_{gc_data.get('gc_player_id', 'unknown')}")
 
-        # Extrai e separa as partidas antes de salvar o jogador
-        last_matches = gc_data.pop('last_matches', [])
+        # Remove campos de debug/temp antes de salvar no Firestore
+        last_matches   = gc_data.pop('last_matches', [])
+        matches_sample = gc_data.pop('_matches_sample', None)
+        matches_type   = gc_data.pop('_matches_type', None)
+        matches_keys   = gc_data.pop('_matches_keys', None)
+        gc_data.pop('available_months', None)
+        gc_data.pop('history_endpoint', None)
+
+        # Loga estrutura dos matches para análise mensal
+        if matches_sample is not None:
+            print(f"[import] matches é LISTA — sample[0]: {str(matches_sample[0])[:300]}")
+        if matches_type == 'dict':
+            print(f"[import] matches é DICT — keys: {matches_keys}")
 
         star_info = calculate_player_stars(gc_data)
         gc_data.update(star_info)

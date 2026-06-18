@@ -298,10 +298,13 @@ def import_player(raw_data):
         # Recalcula DIFF com os novos K e D
         result["DIFF"] = result.get("K", 0) - result.get("D", 0)
 
-        # Guarda matches do histórico para análise mensal
-        hist_matches = history_raw.get("matches", [])
-        if hist_matches:
-            result["last_matches_history"] = hist_matches[:5]  # só para debug
+        # Guarda estrutura dos matches para investigar formato
+        hist_matches_raw = history_raw.get("matches", [])
+        if isinstance(hist_matches_raw, list) and hist_matches_raw:
+            result["_matches_sample"] = hist_matches_raw[:2]
+        elif isinstance(hist_matches_raw, dict):
+            result["_matches_type"] = "dict"
+            result["_matches_keys"] = list(hist_matches_raw.keys())[:10]
 
     return result
 
