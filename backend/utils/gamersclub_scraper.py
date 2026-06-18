@@ -146,6 +146,65 @@ def _parse_matches(matches, player_id):
     return result
 
 
+def parse_history_stats(history_data):
+    """
+    Tenta extrair estatísticas mensais do Histórico.
+    Aceita diferentes formatos que o GamersClub pode retornar.
+    """
+    if not history_data or not isinstance(history_data, dict):
+        return []
+
+    # Tenta encontrar a lista de períodos mensais em campos comuns
+    items = (
+        history_data.get("stats") or
+        history_data.get("history") or
+        history_data.get("data") or
+        history_data.get("months") or
+        history_data.get("periods") or
+        history_data.get("monthly") or
+        []
+    )
+
+    if not isinstance(items, list) or not items:
+        return []
+
+    def get_any(d, *keys, default=0.0):
+        for k in keys:
+            if k in d and d[k] is not None:
+                return _safe_float(d[k])
+        return default
+
+    months = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        period = (
+            item.get("period") or item.get("month") or item.get("date") or
+            item.get("referenceMonth") or item.get("monthYear") or
+            item.get("competitionMonth") or ""
+        )
+
+        months.append({
+            "period":        str(period),
+            "kills":         get_any(item, "kills", "k", "totalKills", "Kills"),
+            "deaths":        get_any(item, "deaths", "d", "totalDeaths", "Deaths"),
+            "assists":       get_any(item, "assists", "a", "totalAssists", "Assists"),
+            "kdr":           get_any(item, "kdr", "KDR", "killDeathRatio"),
+            "adr":           get_any(item, "adr", "ADR", "averageDamageRound", "damagePerRound"),
+            "kast":          get_any(item, "kast", "KAST", "kastPercent", "kast_percent"),
+            "multikills":    get_any(item, "multikills", "multiKills", "mk", "MK", "multiKill"),
+            "first_kills":   get_any(item, "firstKills", "firstKill", "fk", "FK", "first_kill"),
+            "hs":            get_any(item, "hs", "HS", "headshotPercent", "headshot"),
+            "bombs_planted": get_any(item, "bombsPlanted", "planted", "bombPlanted"),
+            "bombs_defused": get_any(item, "bombsDefused", "defused", "bombDefused"),
+            "matches":       get_any(item, "matches", "totalMatches", "games", "gamesPlayed"),
+            "wins":          get_any(item, "wins", "victories", "won"),
+        })
+
+    return months
+
+
 def get_player_matches(player_id):
     """
     Retorna o histórico recente de partidas do jogador.
@@ -189,6 +248,22 @@ def import_player(raw_data):
     bm_avatar = raw_data.get("avatar", "")
     if bm_avatar:
         result["avatar"] = bm_avatar
+
+    # Histórico mensal — capturado pelo bookmarklet via endpoints candidatos
+    history_raw  = raw_data.get("_history_data")
+    history_url  = raw_data.get("_history_url", "")
+    monthly = parse_history_stats(history_raw) if history_raw else []
+    if monthly:
+        result["monthly_stats"]   = monthly
+        result["history_endpoint"] = history_url
+        # Preenche os stats com o mês mais recente se disponível
+        latest = monthly[0]
+        if latest.get("kdr"):  result["KDR"]  = latest["kdr"]
+        if latest.get("adr"):  result["ADR"]  = latest["adr"]
+        if latest.get("kast"): result["KAST"] = latest["kast"]
+        if latest.get("kills"):  result["K"]  = int(latest["kills"])
+        if latest.get("deaths"): result["D"]  = int(latest["deaths"])
+        if latest.get("assists"):result["A"]  = int(latest["assists"])
 
     return result
 
