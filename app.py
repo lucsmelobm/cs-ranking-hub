@@ -7,6 +7,19 @@ import requests
 import sys
 import os
 
+def _now():
+    return datetime.now().isoformat()
+
+def _clean(doc):
+    """Converte campos não-serializáveis de documentos Firestore para string."""
+    out = {}
+    for k, v in doc.items():
+        if hasattr(v, 'isoformat'):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out
+
 sys.path.insert(0, 'backend')
 from utils.star_calculator import calculate_player_stars
 from utils.team_balancer import balance_teams
@@ -39,25 +52,27 @@ except Exception as e:
 def index():
     return send_from_directory('frontend', 'index.html')
 
+@app.route('/api/status', methods=['GET'])
+def status():
+    return jsonify({'firebase': db is not None, 'status': 'ok'})
+
 # ============ PLAYERS API ============
 @app.route('/api/players', methods=['GET'])
 def get_players():
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
     try:
-        players = []
-        docs = db.collection('players').stream()
-        for doc in docs:
-            players.append(doc.to_dict())
+        players = [_clean(doc.to_dict()) for doc in db.collection('players').stream()]
         return jsonify({'success': True, 'data': players})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/ranking', methods=['GET'])
 def get_ranking():
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
     try:
-        players = []
-        docs = db.collection('players').stream()
-        for doc in docs:
-            players.append(doc.to_dict())
+        players = [_clean(doc.to_dict()) for doc in db.collection('players').stream()]
         ranking = sorted(players, key=lambda p: p.get('score', 0), reverse=True)
         return jsonify({'success': True, 'data': ranking})
     except Exception as e:
@@ -65,25 +80,24 @@ def get_ranking():
 
 @app.route('/api/best-player', methods=['GET'])
 def get_best_player():
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
     try:
-        players = []
-        docs = db.collection('players').stream()
-        for doc in docs:
-            players.append(doc.to_dict())
+        players = [_clean(doc.to_dict()) for doc in db.collection('players').stream()]
         best = sorted(players, key=lambda p: p.get('score', 0), reverse=True)
-        if best:
-            return jsonify({'success': True, 'data': best[0]})
-        return jsonify({'success': False, 'data': None})
+        return jsonify({'success': True, 'data': best[0] if best else None})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/player', methods=['POST'])
 def add_player():
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
     try:
         data = request.get_json()
         star_info = calculate_player_stars(data)
         data.update(star_info)
-        data['updated_at'] = datetime.now()
+        data['updated_at'] = _now()
         db.collection('players').document(data['name']).set(data)
         return jsonify({'success': True, 'message': 'Player added'})
     except Exception as e:
@@ -136,7 +150,7 @@ def gc_sync_player():
 
         star_info = calculate_player_stars(gc_data)
         gc_data.update(star_info)
-        gc_data['updated_at'] = datetime.now()
+        gc_data['updated_at'] = _now()
         gc_data['source'] = 'gamersclub'
 
         if db:
@@ -169,7 +183,7 @@ def gc_sync_team():
                 name      = gc_data.get('name', f"Player_{p['gc_player_id']}")
                 star_info = calculate_player_stars(gc_data)
                 gc_data.update(star_info)
-                gc_data['updated_at'] = datetime.now()
+                gc_data['updated_at'] = _now()
                 gc_data['source']     = 'gamersclub'
 
                 if db:
@@ -200,13 +214,14 @@ def gc_import_player():
         name      = gc_data.get('name', f"Player_{gc_data.get('gc_player_id', 'unknown')}")
         star_info = calculate_player_stars(gc_data)
         gc_data.update(star_info)
-        gc_data['updated_at'] = datetime.now()
+        gc_data['updated_at'] = _now()
         gc_data['source']     = 'gamersclub'
 
-        if db:
-            db.collection('players').document(name).set(gc_data)
+        if not db:
+            return jsonify({'success': False, 'error': 'Firebase não conectado — verifique FIREBASE_KEY_B64 no Render'}), 500
 
-        return jsonify({'success': True, 'player': name, 'data': gc_data})
+        db.collection('players').document(name).set(gc_data)
+        return jsonify({'success': True, 'player': name})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
