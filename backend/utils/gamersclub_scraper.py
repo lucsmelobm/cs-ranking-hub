@@ -5,14 +5,25 @@ from datetime import datetime
 GC_BASE = "https://gamersclub.com.br"
 GAMERSCLUB_SESSION = os.getenv("GAMERSCLUB_SESSION", "")
 
-# Mapeamento dos nomes de stat do GamersClub para os campos do ranking
+# Mapeamento dos nomes de stat do GamersClub (em inglês e português)
 _STAT_MAP = {
-    "KDR":         "KDR",
-    "ADR":         "ADR",
-    "KAST%":       "KAST",
-    "Multi Kills": "MK",
-    "First kills": "FK",
-    "HS%":         "HS",
+    "KDR":               "KDR",
+    "ADR":               "ADR",
+    "KAST%":             "KAST",
+    "Multi Kills":       "MK",
+    "First kills":       "FK",
+    "First Kills":       "FK",
+    "HS%":               "HS",
+    # Nomes em português (endpoint /api/box/history)
+    "Matou":             "K",
+    "Morreu":            "D",
+    "Assistências":      "A",
+    "Assists":           "A",
+    "Bombas Plantadas":  "bombs_planted",
+    "Bombas Defusadas":  "bombs_defused",
+    "Multi kills":       "MK",
+    "Primeiro a matar":  "FK",
+    "Headshot%":         "HS",
 }
 
 
@@ -253,37 +264,44 @@ def import_player(raw_data):
     if bm_avatar:
         result["avatar"] = bm_avatar
 
-    # Histórico mensal via /api/box/history/{id}
+    # Histórico via /api/box/history/{id}
     history_raw = raw_data.get("_history_data") or {}
-    history_url = raw_data.get("_history_url", "/api/box/history/{id}")
+    history_url = raw_data.get("_history_url", "")
 
-    # Tenta também extrair avatar do campo character da resposta de histórico
-    hist_char = history_raw.get("character", {}) if history_raw else {}
-    hist_avatar = (
-        hist_char.get("avatar") or hist_char.get("photoUrl") or
-        hist_char.get("image") or hist_char.get("url") or ""
-    )
-    if hist_avatar and not result.get("avatar"):
-        result["avatar"] = hist_avatar
+    if history_raw:
+        # Avatar do character do histórico
+        hist_char = history_raw.get("character", {})
+        hist_avatar = (
+            hist_char.get("avatar") or hist_char.get("photoUrl") or
+            hist_char.get("image") or hist_char.get("url") or ""
+        )
+        if hist_avatar and not result.get("avatar"):
+            result["avatar"] = hist_avatar
 
-    monthly = parse_history_stats(history_raw)
-    if monthly:
-        result["monthly_stats"]    = monthly
-        result["history_endpoint"] = history_url
-        # Usa o mês mais recente para o score/ranking
-        latest = monthly[0]
-        if latest.get("kdr"):          result["KDR"]  = latest["kdr"]
-        if latest.get("adr"):          result["ADR"]  = latest["adr"]
-        if latest.get("kast"):         result["KAST"] = latest["kast"]
-        if latest.get("kills"):        result["K"]    = int(latest["kills"])
-        if latest.get("deaths"):       result["D"]    = int(latest["deaths"])
-        if latest.get("assists"):      result["A"]    = int(latest["assists"])
-        if latest.get("multikills"):   result["MK"]   = int(latest["multikills"])
-        if latest.get("first_kills"):  result["FK"]   = int(latest["first_kills"])
-        if latest.get("hs"):           result["HS"]   = latest["hs"]
-        if latest.get("bombs_planted"):result["bombs_planted"] = int(latest["bombs_planted"])
-        if latest.get("bombs_defused"):result["bombs_defused"] = int(latest["bombs_defused"])
-        result["DIFF"] = result["K"] - result["D"]
+        # Usa o array "stat" do histórico — tem Matou, Morreu, KAST%, etc.
+        # Esses dados são mais completos que os do box/init
+        hist_stats = history_raw.get("stat", [])
+        if isinstance(hist_stats, list):
+            for s in hist_stats:
+                name  = s.get("stat", "")
+                value = s.get("value", 0)
+                field = _STAT_MAP.get(name)
+                if field:
+                    result[field] = _safe_float(value)
+
+        # Lista de meses disponíveis
+        months_list = history_raw.get("months", [])
+        if months_list:
+            result["available_months"] = months_list
+            result["history_endpoint"] = history_url
+
+        # Recalcula DIFF com os novos K e D
+        result["DIFF"] = result.get("K", 0) - result.get("D", 0)
+
+        # Guarda matches do histórico para análise mensal
+        hist_matches = history_raw.get("matches", [])
+        if hist_matches:
+            result["last_matches_history"] = hist_matches[:5]  # só para debug
 
     return result
 

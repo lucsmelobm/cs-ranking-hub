@@ -472,16 +472,15 @@ function initBookmarklet() {
       var data = results[0];
       var hist = results[1];
 
-      // Debug local: estrutura do array months
+      // Debug: ver matches[0] e endpoint por mês
       var localMonths = (hist && Array.isArray(hist.months)) ? hist.months : [];
       var localCount  = localMonths.length;
-      // months é alternado: [periodo, [stats], periodo, [stats], ...]
-      var isAlt = localCount > 0 && typeof localMonths[0] === 'string';
+      var histMatches = (hist && Array.isArray(hist.matches)) ? hist.matches : [];
       var firstSample = '';
-      firstSample += 'months[0]: ' + JSON.stringify(localMonths[0]).substring(0, 80) + '\\n';
-      firstSample += 'months[1]: ' + JSON.stringify(localMonths[1]).substring(0, 200) + '\\n';
-      firstSample += 'stat key:  ' + JSON.stringify(hist && hist.stat).substring(0, 200);
-      var firstKeys = isAlt ? 'formato alternado (string+array)' : Object.keys(localMonths[0] || {}).join(',');
+      firstSample += 'matches count: ' + histMatches.length + '\\n';
+      firstSample += 'matches[0]: ' + JSON.stringify(histMatches[0]).substring(0, 250) + '\\n';
+      firstSample += 'stat completo: ' + JSON.stringify(hist && hist.stat).substring(0, 300);
+      var firstKeys = 'ver Dados abaixo';
 
       data.avatar = findAvatar(data);
       if (hist) {
