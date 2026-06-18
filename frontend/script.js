@@ -472,11 +472,16 @@ function initBookmarklet() {
       var data = results[0];
       var hist = results[1];
 
-      // Debug local: conta meses e mostra chaves antes de enviar ao backend
-      var localMonths  = (hist && Array.isArray(hist.months)) ? hist.months : [];
-      var localCount   = localMonths.length;
-      var firstKeys    = localCount > 0 ? Object.keys(localMonths[0]).join(',') : 'array vazio';
-      var firstSample  = localCount > 0 ? JSON.stringify(localMonths[0]).substring(0, 300) : '';
+      // Debug local: estrutura do array months
+      var localMonths = (hist && Array.isArray(hist.months)) ? hist.months : [];
+      var localCount  = localMonths.length;
+      // months é alternado: [periodo, [stats], periodo, [stats], ...]
+      var isAlt = localCount > 0 && typeof localMonths[0] === 'string';
+      var firstSample = '';
+      firstSample += 'months[0]: ' + JSON.stringify(localMonths[0]).substring(0, 80) + '\\n';
+      firstSample += 'months[1]: ' + JSON.stringify(localMonths[1]).substring(0, 200) + '\\n';
+      firstSample += 'stat key:  ' + JSON.stringify(hist && hist.stat).substring(0, 200);
+      var firstKeys = isAlt ? 'formato alternado (string+array)' : Object.keys(localMonths[0] || {}).join(',');
 
       data.avatar = findAvatar(data);
       if (hist) {
