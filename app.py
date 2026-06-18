@@ -243,6 +243,23 @@ def get_ranking(period='all'):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/admin/clear-avatars', methods=['POST'])
+def clear_avatars():
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
+    data = request.get_json() or {}
+    if not ADMIN_PASSWORD or data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 401
+    try:
+        cleared = 0
+        for doc in db.collection('players').stream():
+            db.collection('players').document(doc.id).update({'avatar': ''})
+            cleared += 1
+        return jsonify({'success': True, 'cleared': cleared})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/stats/map-week', methods=['GET'])
 def map_of_week():
     if not db:

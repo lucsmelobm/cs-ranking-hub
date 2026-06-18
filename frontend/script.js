@@ -416,54 +416,13 @@ function initBookmarklet() {
   var id = url.split('/player/')[1].split('/')[0].split('?')[0];
 
   function findAvatar(apiData) {
-    var playerId = String((apiData && apiData.playerInfo && apiData.playerInfo.id) || '');
-
-    // 1. Nuxt store — busca por posição de string (robusto com objetos aninhados)
-    try {
-      var nd = JSON.stringify(window.__nuxt__ || window.__NUXT__ || {});
-      if (playerId && nd) {
-        var idToken = '"id":' + playerId;
-        var pos = nd.indexOf(idToken);
-        while (pos >= 0) {
-          // Janela de 2000 chars ao redor do ID do jogador
-          var seg = nd.substring(Math.max(0, pos - 300), pos + 2000);
-          var pm = seg.match(new RegExp('"photoUrl":"([^"]+)"'));
-          if (pm && pm[1] && pm[1].startsWith('http')) return pm[1];
-          pos = nd.indexOf(idToken, pos + 1);
-        }
-        // Fallback: primeiro photoUrl no store inteiro
-        var allUrls = nd.match(new RegExp('"photoUrl":"(https?://[^"]{20,})"', 'g'));
-        if (allUrls && allUrls[0]) {
-          var first = allUrls[0].match(new RegExp('"photoUrl":"([^"]+)"'));
-          if (first && first[1]) return first[1];
-        }
-      }
-    } catch(ex) {}
-
-    // 2. og:image — definido pelo servidor para o perfil atual
+    // Apenas og:image (definido pelo servidor para o jogador da página)
     var og = document.querySelector('meta[property="og:image"]');
     var ogVal = og && og.getAttribute('content');
     if (ogVal && ogVal.startsWith('http') && !ogVal.includes('/logo') && !ogVal.includes('default')) return ogVal;
-
-    // 3. Campos diretos da API (playerInfo)
+    // Campo direto da API
     var info = (apiData && apiData.playerInfo) || {};
-    var fromApi = info.photoUrl || info.avatar || info.photo || info.picture || info.image || '';
-    if (fromApi && fromApi.startsWith('http')) return fromApi;
-
-    // 4. Primeira img grande (>=60px) que seja Steam CDN — avatar do próprio perfil
-    var cdn = ['steamcdn','akamaihd','steamstatic','avatars.steamstatic','steamcommunity'];
-    var imgs = document.querySelectorAll('img');
-    for (var i = 0; i < imgs.length; i++) {
-      var el = imgs[i];
-      var rect = el.getBoundingClientRect();
-      if (rect.width < 48 || rect.height < 48) continue; // ignora thumbnails pequenos
-      var src = el.src || el.getAttribute('data-src') || el.getAttribute('lazy-src') || '';
-      for (var c = 0; c < cdn.length; c++) {
-        if (src && src.includes(cdn[c])) return src;
-      }
-    }
-
-    return ogVal || '';
+    return info.photoUrl || info.avatar || info.photo || '';
   }
 
   Promise.all([
@@ -527,6 +486,26 @@ function initBookmarklet() {
 function renderSync() {
   initBookmarklet();
   initDetectBookmarklet();
+  const clearBtn = document.getElementById('clear-avatars-btn');
+  if (clearBtn) {
+    clearBtn.onclick = async () => {
+      const pwd = sessionStorage.getItem('avance_pwd');
+      if (!pwd) return toast('Faça login primeiro', 'error');
+      clearBtn.disabled = true;
+      clearBtn.textContent = 'Limpando...';
+      try {
+        const res  = await fetch(`${API}/admin/clear-avatars`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ password: pwd })
+        });
+        const json = await res.json();
+        if (json.success) toast(`✅ ${json.cleared} fotos removidas — sincronize os jogadores novamente`);
+        else toast('Erro: ' + json.error, 'error');
+      } catch { toast('Erro de conexão', 'error'); }
+      clearBtn.disabled = false;
+      clearBtn.innerHTML = '<i class="fas fa-image"></i> Limpar fotos salvas (requer novo sync)';
+    };
+  }
 }
 
 function initDetectBookmarklet() {
