@@ -30,6 +30,7 @@ app.secret_key = 'cs-ranking-hub-secret-key-2024'
 CORS(app, supports_credentials=True)
 
 # ============ FIREBASE ============
+_firebase_error = None
 try:
     firebase_key_b64 = os.getenv('FIREBASE_KEY_B64')
     if firebase_key_b64:
@@ -42,6 +43,7 @@ try:
     db = firestore.client()
     print("✅ Firebase conectado")
 except Exception as e:
+    _firebase_error = str(e)
     print(f"Firebase init error: {e}")
     db = None
 
@@ -54,7 +56,7 @@ def index():
 
 @app.route('/api/status', methods=['GET'])
 def status():
-    return jsonify({'firebase': db is not None, 'status': 'ok'})
+    return jsonify({'firebase': db is not None, 'firebase_error': _firebase_error, 'status': 'ok'})
 
 # ============ PLAYERS API ============
 @app.route('/api/players', methods=['GET'])
