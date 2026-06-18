@@ -425,14 +425,14 @@ function initBookmarklet() {
         while (pos >= 0) {
           // Janela de 2000 chars ao redor do ID do jogador
           var seg = nd.substring(Math.max(0, pos - 300), pos + 2000);
-          var pm = seg.match(/"photoUrl":"([^"]+)"/);
+          var pm = seg.match(new RegExp('"photoUrl":"([^"]+)"'));
           if (pm && pm[1] && pm[1].startsWith('http')) return pm[1];
           pos = nd.indexOf(idToken, pos + 1);
         }
-        // Fallback: primeiro photoUrl Steam CDN no store inteiro
-        var allUrls = nd.match(/"photoUrl":"(https?:\/\/[^"]{20,})"/g);
+        // Fallback: primeiro photoUrl no store inteiro
+        var allUrls = nd.match(new RegExp('"photoUrl":"(https?://[^"]{20,})"', 'g'));
         if (allUrls && allUrls[0]) {
-          var first = allUrls[0].match(/"photoUrl":"([^"]+)"/);
+          var first = allUrls[0].match(new RegExp('"photoUrl":"([^"]+)"'));
           if (first && first[1]) return first[1];
         }
       }
