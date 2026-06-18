@@ -478,8 +478,8 @@ function initBookmarklet() {
       var histMatches = (hist && Array.isArray(hist.matches)) ? hist.matches : [];
       var firstSample = '';
       firstSample += 'matches count: ' + histMatches.length + '\\n';
-      firstSample += 'matches[0]: ' + JSON.stringify(histMatches[0]).substring(0, 250) + '\\n';
-      firstSample += 'stat completo: ' + JSON.stringify(hist && hist.stat).substring(0, 300);
+      firstSample += 'matches[0]: ' + (JSON.stringify(histMatches[0]) || 'undefined').substring(0, 250) + '\\n';
+      firstSample += 'stat completo: ' + (JSON.stringify(hist && hist.stat) || 'null').substring(0, 300);
       var firstKeys = 'ver Dados abaixo';
 
       data.avatar = findAvatar(data);
