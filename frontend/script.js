@@ -471,25 +471,32 @@ function initBookmarklet() {
     .then(function(results) {
       var data = results[0];
       var hist = results[1];
+
+      // Debug local: conta meses e mostra chaves antes de enviar ao backend
+      var localMonths  = (hist && Array.isArray(hist.months)) ? hist.months : [];
+      var localCount   = localMonths.length;
+      var firstKeys    = localCount > 0 ? Object.keys(localMonths[0]).join(',') : 'array vazio';
+      var firstSample  = localCount > 0 ? JSON.stringify(localMonths[0]).substring(0, 300) : '';
+
       data.avatar = findAvatar(data);
       if (hist) {
         data._history_url  = '/api/box/history/' + id;
         data._history_data = hist;
       }
+
       return fetch('${backendUrl}/api/gamersclub/import', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
+      }).then(function(r){ return r.json(); }).then(function(r){
+        if (r.success) {
+          var msg = '\\u2705 ' + r.player + ' sincronizado!';
+          msg += '\\n\\uD83D\\uDCC5 Meses capturados (cliente): ' + localCount;
+          msg += '\\nCampos do 1\\u00BA m\\u00EAs: ' + firstKeys;
+          if (firstSample) msg += '\\nDados: ' + firstSample;
+          alert(msg);
+        } else alert('\\u274c Erro: ' + r.error);
       });
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(r){
-      if (r.success) {
-        var msg = '\\u2705 ' + r.player + ' sincronizado!';
-        if (r.monthly_periods) msg += '\\n\\uD83D\\uDCC5 ' + r.monthly_periods + ' meses de histórico salvos';
-        if (r.first_month_keys) msg += '\\nCampos: ' + r.first_month_keys;
-        alert(msg);
-      } else alert('\\u274c Erro: ' + r.error);
     })
     .catch(function(e){ alert('\\u274c Erro: ' + e.message); });
 })();`;
