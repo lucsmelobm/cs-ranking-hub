@@ -526,6 +526,50 @@ function initBookmarklet() {
 
 function renderSync() {
   initBookmarklet();
+  initDetectBookmarklet();
+}
+
+function initDetectBookmarklet() {
+  const detectCode = `(function(){
+  if (!window.location.href.includes('gamersclub.com.br/player/')) {
+    return alert('Abra o perfil de um jogador no GamersClub primeiro!');
+  }
+  var id = window.location.href.split('/player/')[1].split('/')[0].split('?')[0];
+  var found = [];
+  var candidates = [
+    '/api/box/history/' + id,
+    '/api/player/history/' + id,
+    '/api/box/playerHistory/' + id,
+    '/api/box/statsHistory/' + id,
+    '/api/player/' + id + '/history',
+    '/api/player/' + id + '/stats/history',
+    '/api/player/' + id + '/stats',
+    '/api/box/ranking/' + id,
+    '/api/player/stats/' + id,
+  ];
+  var results = [];
+  var pending = candidates.length;
+  candidates.forEach(function(url) {
+    fetch(url, {credentials:'include'})
+      .then(function(r) {
+        return r.json().then(function(d) {
+          var keys = Object.keys(d || {});
+          if (keys.length > 1) results.push(url + ' [keys: ' + keys.slice(0,5).join(',') + ']');
+        });
+      })
+      .catch(function(){})
+      .finally(function() {
+        pending--;
+        if (pending === 0) {
+          if (results.length) alert('Endpoints com dados:\\n' + results.join('\\n'));
+          else alert('Nenhum endpoint retornou dados.\\nVerifique o Network tab (F12) ao clicar em Histórico.');
+        }
+      });
+  });
+})();`;
+
+  const link = document.getElementById('detect-link');
+  if (link) link.href = 'javascript:' + encodeURIComponent(detectCode);
 }
 
 /* ─── TOAST ───────────────────────────────── */
