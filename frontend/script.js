@@ -3,8 +3,6 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
   ? 'http://localhost:5000/api'
   : 'https://cs-ranking-hub.onrender.com/api';
 
-const BACKEND = API.replace('/api', '');
-
 /* ─── STATE ───────────────────────────────── */
 let players = [];
 let picked  = [];
@@ -14,7 +12,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   initNav();
   await fetchPlayers();
   renderDashboard();
-  checkLoginCallback();
   document.getElementById('syncBtn').addEventListener('click', syncNow);
   document.getElementById('gen-btn').addEventListener('click', generateTeams);
   document.getElementById('search').addEventListener('input', e => filterPlayers(e.target.value));
@@ -36,10 +33,6 @@ function initNav() {
       if (tab === 'teams')   renderPickGrid();
     });
   });
-
-  document.getElementById('steamLoginBtn').addEventListener('click', () => {
-    window.location.href = `${BACKEND}/api/steam/login`;
-  });
 }
 
 /* ─── FETCH ───────────────────────────────── */
@@ -58,12 +51,11 @@ async function syncNow() {
   const btn = document.getElementById('syncBtn');
   btn.classList.add('spin');
   try {
-    await fetch(`${API}/sync-now`, { method: 'POST' });
     await fetchPlayers();
     renderDashboard();
-    toast('✅ Dados sincronizados!');
+    toast('✅ Dados atualizados!');
   } catch {
-    toast('❌ Erro ao sincronizar', 'error');
+    toast('❌ Erro ao atualizar', 'error');
   }
   btn.classList.remove('spin');
 }
@@ -82,7 +74,7 @@ function renderDashboard() {
   /* Best Player */
   const bp = qs('#best-player-body');
   if (!best) {
-    bp.innerHTML = steamCTA('Faça login para ver o destaque da semana');
+    bp.innerHTML = '<div class="empty-msg">Nenhum jogador cadastrado ainda</div>';
   } else {
     bp.innerHTML = `
       <div class="bp-avatar">
@@ -100,7 +92,7 @@ function renderDashboard() {
 
   /* Top list */
   if (!ranked.length) {
-    qs('#top-list').innerHTML = `<li>${steamCTA('Nenhum jogador ainda. Faça login com Steam!')}</li>`;
+    qs('#top-list').innerHTML = '<li class="empty-msg">Nenhum jogador cadastrado ainda</li>';
   } else {
     qs('#top-list').innerHTML = ranked.slice(0, 6).map((p, i) => `
       <li class="player-list-item">
@@ -117,7 +109,7 @@ function renderDashboard() {
 /* ─── RANKING ─────────────────────────────── */
 function renderRanking() {
   if (!players.length) {
-    qs('#ranking-list').innerHTML = `<li>${steamCTA('Faça login com Steam para aparecer no ranking')}</li>`;
+    qs('#ranking-list').innerHTML = '<li class="empty-msg">Nenhum jogador cadastrado ainda</li>';
     return;
   }
   const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -141,7 +133,7 @@ function renderRanking() {
 /* ─── PLAYERS GRID ────────────────────────── */
 function renderPlayers(list) {
   if (!players.length) {
-    qs('#players-grid').innerHTML = steamCTA('Faça login com Steam para ver os perfis dos jogadores');
+    qs('#players-grid').innerHTML = '<div class="empty-msg">Nenhum jogador cadastrado ainda</div>';
     return;
   }
   qs('#players-grid').innerHTML = list.length
@@ -178,7 +170,7 @@ function renderPickGrid() {
   qs('#gen-btn').disabled = true;
 
   if (!players.length) {
-    qs('#pick-grid').innerHTML = steamCTA('Faça login com Steam para sortear os times');
+    qs('#pick-grid').innerHTML = '<div class="empty-msg">Nenhum jogador cadastrado ainda</div>';
     return;
   }
 
@@ -252,18 +244,6 @@ function showTeams(data) {
   qs('#teams-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-/* ─── STEAM LOGIN CALLBACK ────────────────── */
-function checkLoginCallback() {
-  const p = new URLSearchParams(window.location.search);
-  if (p.get('login') === 'success') {
-    toast(`✅ Bem-vindo, ${p.get('player') || 'Jogador'}!`);
-    history.replaceState({}, '', '/');
-  } else if (p.get('login') === 'error') {
-    toast('❌ Erro no login Steam', 'error');
-    history.replaceState({}, '', '/');
-  }
-}
-
 /* ─── TOAST ───────────────────────────────── */
 function toast(msg, type = 'success') {
   const el = qs('#toast');
@@ -273,21 +253,12 @@ function toast(msg, type = 'success') {
 }
 
 /* ─── HELPERS ─────────────────────────────── */
-const qs   = sel => document.querySelector(sel);
-const fmt  = (v, d = 1) => (+v || 0).toFixed(d);
-const avg  = (arr, key) => arr.length ? arr.reduce((s, p) => s + (+p[key] || 0), 0) / arr.length : 0;
+const qs    = sel => document.querySelector(sel);
+const fmt   = (v, d = 1) => (+v || 0).toFixed(d);
+const avg   = (arr, key) => arr.length ? arr.reduce((s, p) => s + (+p[key] || 0), 0) / arr.length : 0;
 const first = str => str.split(' ')[0];
 const slug  = str => str.toLowerCase().replace(/\s+/g, '-');
 const stars = n => '⭐'.repeat(Math.max(1, Math.min(3, n || 1)));
 const stat  = (k, v) => `<div class="pc-stat"><span class="pc-stat-k">${k}</span><span class="pc-stat-v">${v}</span></div>`;
 const medal = i => i === 1 ? '🥇' : i === 2 ? '🥈' : i === 3 ? '🥉' : `#${i}`;
-const steamCTA = (msg) => `
-  <div class="steam-cta">
-    <div class="steam-cta-icon">🎮</div>
-    <div class="steam-cta-msg">${msg}</div>
-    <button class="btn-steam-cta" onclick="window.location.href='${BACKEND}/api/steam/login'">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12c0 5.303 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
-      Entrar com Steam
-    </button>
-  </div>`;
 
