@@ -488,11 +488,13 @@ function initBookmarklet() {
         data._history_data = hist;
       }
 
-      // Proba endpoint de stats por mês (para investigar estrutura)
-      var mostRecentMonth = localMonths[0] || '';
-      var monthProbe = mostRecentMonth
-        ? fetch('/api/box/history/' + id + '?month=' + mostRecentMonth, {credentials:'include'}).then(function(r){ return r.json(); }).catch(function(){ return null; })
-        : Promise.resolve(null);
+      // Proba mês atual e mês anterior para ver qual tem monthMatches populado
+      var month0 = localMonths[0] || '';
+      var month1 = localMonths[1] || '';
+      var fetchMonth = function(m) {
+        return m ? fetch('/api/box/history/' + id + '?month=' + m, {credentials:'include'}).then(function(r){ return r.json(); }).catch(function(){ return null; }) : Promise.resolve(null);
+      };
+      var monthProbe = Promise.all([fetchMonth(month0), fetchMonth(month1)]);
 
       return Promise.all([
         fetch('${backendUrl}/api/gamersclub/import', {
@@ -502,33 +504,29 @@ function initBookmarklet() {
         }).then(function(r){ return r.json(); }),
         monthProbe
       ]).then(function(r2){
-        var r = r2[0];
-        var monthData = r2[1];
+        var r    = r2[0];
+        var mArr = r2[1]; // [month0data, month1data]
         if (r.success) {
           var msg = '\\u2705 ' + r.player + ' sincronizado!';
           msg += '\\n\\uD83C\\uDFC6 ' + winInfo;
           msg += '\\n\\uD83D\\uDCC5 Meses: ' + localCount + ' (' + localMonths.slice(0,3).join(', ') + ')';
-          if (monthData) {
-            var mm = monthData.monthMatches;
-            if (mm !== undefined && mm !== null) {
-              if (Array.isArray(mm)) {
-                msg += '\\n\\uD83D\\uDCCA monthMatches LISTA[' + mm.length + ']';
-                msg += '\\n[0]: ' + (JSON.stringify(mm[0]) || 'vazio').substring(0, 350);
-              } else if (typeof mm === 'object') {
-                var mmkeys = Object.keys(mm);
-                msg += '\\n\\uD83D\\uDCCA monthMatches DICT keys(' + mmkeys.length + '): ' + mmkeys.slice(0,10).join(', ');
-                if (mmkeys.length > 0) {
-                  msg += '\\n["' + mmkeys[0] + '"]: ' + (JSON.stringify(mm[mmkeys[0]]) || 'vazio').substring(0, 300);
-                }
-              } else {
-                msg += '\\nmonthMatches: ' + (JSON.stringify(mm) || String(mm)).substring(0, 200);
-              }
-            } else {
-              msg += '\\n?month= sem monthMatches, keys: ' + Object.keys(monthData).join(',');
+          function describeMonth(label, md) {
+            if (!md) return '\\n' + label + ': sem resposta';
+            var mm = md.monthMatches;
+            if (mm === undefined || mm === null) return '\\n' + label + ' sem monthMatches';
+            if (Array.isArray(mm)) {
+              var s = '\\n' + label + ' LISTA[' + mm.length + ']';
+              if (mm.length > 0) s += ': ' + (JSON.stringify(mm[0]) || 'vazio').substring(0, 300);
+              return s;
             }
-          } else {
-            msg += '\\n?month= sem resposta';
+            if (typeof mm === 'object') {
+              var ks = Object.keys(mm);
+              return '\\n' + label + ' DICT keys: ' + ks.slice(0,8).join(',') + (ks.length > 0 ? ' v0:' + (JSON.stringify(mm[ks[0]]) || '').substring(0,150) : '');
+            }
+            return '\\n' + label + ': ' + String(mm).substring(0,100);
           }
+          msg += describeMonth(month0, mArr[0]);
+          msg += describeMonth(month1, mArr[1]);
           alert(msg);
         } else alert('\\u274c Erro: ' + r.error);
       });
