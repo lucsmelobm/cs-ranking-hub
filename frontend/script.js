@@ -411,26 +411,56 @@ function initBookmarklet() {
   var id = url.split('/player/')[1].split('/')[0].split('?')[0];
 
   function findAvatar(apiData) {
+    // 1. OG image tag — GamersClub seta com a foto do jogador (mais confiável)
+    var og = document.querySelector('meta[property="og:image"]');
+    if (og && og.getAttribute('content')) return og.getAttribute('content');
+
+    // 2. Campos da resposta da API
     var info = (apiData && apiData.playerInfo) || {};
     var char = (apiData && apiData.character) || {};
     var fromApi = info.photoUrl || info.avatar || info.photo || info.picture ||
-                  char.avatar || char.photoUrl || char.image || char.url || '';
+                  info.profilePicture || info.image ||
+                  char.avatar || char.photoUrl || char.image || char.url ||
+                  char.photo || char.profilePicture || '';
     if (fromApi) return fromApi;
+
+    // 3. Imagens do DOM — sem filtro de naturalWidth (lazy load)
+    var cdn = ['steamcdn','akamaihd','steamstatic','avatars.steam',
+               'gamersclub.com.br/storage','cdn.gamersclub'];
     var imgs = document.querySelectorAll('img');
-    var cdn = ['steamcdn','akamaihd','steamstatic','avatars.steam','gamersclub.com.br/storage'];
     for (var i = 0; i < imgs.length; i++) {
-      var src = imgs[i].src || '';
-      var nat = imgs[i].naturalWidth;
-      if (src && nat >= 40 && nat <= 500) {
+      var src = imgs[i].src ||
+                imgs[i].getAttribute('data-src') ||
+                imgs[i].getAttribute('lazy-src') ||
+                imgs[i].getAttribute('data-lazy') || '';
+      if (src) {
         for (var c = 0; c < cdn.length; c++) {
           if (src.includes(cdn[c])) return src;
         }
       }
     }
-    for (var j = 0; j < imgs.length; j++) {
-      var s = imgs[j].src || '';
-      if (s && imgs[j].naturalWidth >= 40) return s;
+
+    // 4. CSS background-image com CDN do Steam
+    var els = document.querySelectorAll('*');
+    for (var e = 0; e < els.length && e < 300; e++) {
+      var bg = window.getComputedStyle(els[e]).backgroundImage || '';
+      if (bg && bg !== 'none') {
+        for (var c2 = 0; c2 < cdn.length; c2++) {
+          if (bg.includes(cdn[c2])) {
+            var m = bg.match(/url\\(['"]?([^'"]+)['"]?\\)/);
+            if (m) return m[1];
+          }
+        }
+      }
     }
+
+    // 5. Nuxt/Vue store como fallback
+    try {
+      var nd = JSON.stringify(window.__nuxt__ || window.__NUXT__ || {});
+      var match = nd.match(/"(https?:\\/\\/[^"]*(?:steamcdn|akamaihd|steamstatic|avatars\\.steam)[^"]{8,})"/i);
+      if (match) return match[1];
+    } catch(ex) {}
+
     return '';
   }
 

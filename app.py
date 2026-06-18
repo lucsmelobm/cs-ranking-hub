@@ -243,6 +243,22 @@ def get_best_player():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/player/<path:name>/avatar', methods=['PATCH'])
+def update_avatar(name):
+    """Atualiza só o avatar de um jogador (chamado pelo bookmarklet de avatar)."""
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
+    data = request.get_json() or {}
+    avatar = data.get('avatar', '')
+    if not avatar:
+        return jsonify({'success': False, 'error': 'Avatar vazio'}), 400
+    try:
+        db.collection('players').document(name).update({'avatar': avatar})
+        return jsonify({'success': True, 'player': name, 'avatar': avatar})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/player/<path:name>', methods=['DELETE'])
 def delete_player(name):
     if not db:
