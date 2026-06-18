@@ -120,7 +120,9 @@ function initRankingTabs() {
 
 async function renderRanking(period = 'all') {
   const list = qs('#ranking-list');
+  const mapBadge = qs('#map-badge');
   list.innerHTML = '<li class="empty-msg">Carregando...</li>';
+  if (mapBadge) mapBadge.style.display = 'none';
 
   try {
     let data;
@@ -130,13 +132,26 @@ async function renderRanking(period = 'all') {
       const res  = await fetch(`${API}/ranking/${period}`);
       const json = await res.json();
       data = json.success ? json.data : [];
+
+      // Busca mapa mais jogado da semana
+      if (period === 'weekly' && mapBadge) {
+        try {
+          const mapRes  = await fetch(`${API}/stats/map-week`);
+          const mapJson = await mapRes.json();
+          if (mapJson.success && mapJson.map) {
+            qs('#map-badge-name').textContent = mapJson.map + ` (${mapJson.count}x)`;
+            mapBadge.style.display = 'flex';
+          }
+        } catch { /* silently ignore */ }
+      }
     }
 
     if (!data.length) {
-      list.innerHTML = '<li class="empty-msg">Nenhum dado para este período. Sincronize jogadores primeiro.</li>';
+      list.innerHTML = '<li class="empty-msg">Nenhum dado para este período — sincronize os jogadores via bookmarklet.</li>';
       return;
     }
 
+    const isPeriod = period !== 'all';
     list.innerHTML = data.map((p, i) => `
       <li class="rank-item">
         <span class="rank-pos">${medal(i + 1)}</span>
@@ -146,16 +161,23 @@ async function renderRanking(period = 'all') {
         <div class="rank-info">
           <div class="rank-name">${p.name} ${stars(p.stars)}</div>
           <div class="rank-meta">
-            <span>KDR ${fmt(p.KDR, 2)}</span>
-            <span>ADR ${fmt(p.ADR)}</span>
-            <span>KAST ${fmt(p.KAST, 0)}%</span>
-            <span>K ${p.K ?? 0}</span>
-            <span>D ${p.D ?? 0}</span>
+            ${isPeriod ? `
+              <span>🎮 ${p.period_matches ?? 0} partidas</span>
+              <span>🏆 ${p.win_rate ?? 0}% vitórias</span>
+              <span>⭐ Rating ${fmt(p.avg_rating, 0)}</span>
+              ${p.top_map ? `<span>🗺️ ${p.top_map}</span>` : ''}
+            ` : `
+              <span>KDR ${fmt(p.KDR, 2)}</span>
+              <span>ADR ${fmt(p.ADR)}</span>
+              <span>KAST ${fmt(p.KAST, 0)}%</span>
+              <span>K ${p.K ?? 0}</span>
+              <span>D ${p.D ?? 0}</span>
+            `}
           </div>
         </div>
-        <span class="rank-score">${fmt(p.score)}</span>
+        <span class="rank-score">${isPeriod ? fmt(p.avg_rating, 0) : fmt(p.score)}</span>
       </li>`).join('');
-  } catch {
+  } catch (e) {
     list.innerHTML = '<li class="empty-msg">Erro ao carregar ranking</li>';
   }
 }
@@ -375,7 +397,7 @@ function requireAuth(onSuccess) {
 
   btn.onclick = attempt;
   input.onkeydown = e => { if (e.key === 'Enter') attempt(); };
-  overlay.onclick = e => { if (e.target === overlay) overlay.style.display = 'none'; };
+  // Não fecha ao clicar fora — área restrita deve exigir senha
 }
 
 /* ─── BOOKMARKLET ─────────────────────────── */
@@ -387,19 +409,35 @@ function initBookmarklet() {
     return alert('Abra o perfil de um jogador no GamersClub primeiro!');
   }
   var id = url.split('/player/')[1].split('/')[0].split('?')[0];
-  var avatar = '';
-  var imgs = document.querySelectorAll('img');
-  for (var i = 0; i < imgs.length; i++) {
-    var src = imgs[i].src || '';
-    if (src && (src.includes('steamcdn') || src.includes('akamaihd') || src.includes('steamstatic') || src.includes('avatars.steam'))) {
-      avatar = src;
-      break;
+
+  function findAvatar(apiData) {
+    var info = (apiData && apiData.playerInfo) || {};
+    var char = (apiData && apiData.character) || {};
+    var fromApi = info.photoUrl || info.avatar || info.photo || info.picture ||
+                  char.avatar || char.photoUrl || char.image || char.url || '';
+    if (fromApi) return fromApi;
+    var imgs = document.querySelectorAll('img');
+    var cdn = ['steamcdn','akamaihd','steamstatic','avatars.steam','gamersclub.com.br/storage'];
+    for (var i = 0; i < imgs.length; i++) {
+      var src = imgs[i].src || '';
+      var nat = imgs[i].naturalWidth;
+      if (src && nat >= 40 && nat <= 500) {
+        for (var c = 0; c < cdn.length; c++) {
+          if (src.includes(cdn[c])) return src;
+        }
+      }
     }
+    for (var j = 0; j < imgs.length; j++) {
+      var s = imgs[j].src || '';
+      if (s && imgs[j].naturalWidth >= 40) return s;
+    }
+    return '';
   }
+
   fetch('/api/box/init/' + id)
     .then(function(r){ return r.json(); })
     .then(function(data){
-      data.avatar = avatar;
+      data.avatar = findAvatar(data);
       return fetch('${backendUrl}/api/gamersclub/import', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -408,7 +446,7 @@ function initBookmarklet() {
     })
     .then(function(r){ return r.json(); })
     .then(function(r){
-      if (r.success) alert('\\u2705 ' + r.player + ' sincronizado no ranking!');
+      if (r.success) alert('\\u2705 ' + r.player + ' sincronizado! Partidas salvas: ' + (r.matches_saved || 0));
       else alert('\\u274c Erro: ' + r.error);
     })
     .catch(function(e){ alert('\\u274c Erro: ' + e.message); });

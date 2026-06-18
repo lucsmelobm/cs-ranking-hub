@@ -78,6 +78,19 @@ def _save_snapshot(player_data):
     db.collection('snapshots').document(doc_id).set(snap)
 
 
+def _save_matches(player_name, matches):
+    """Salva partidas individuais no Firestore (upsert por match_id + player)."""
+    if not db or not matches:
+        return
+    for m in matches:
+        match_id = m.get('match_id', '')
+        if not match_id:
+            continue
+        doc_id = f"{match_id}_{player_name}".replace(' ', '_').replace('/', '-')
+        m['player_name'] = player_name
+        db.collection('matches').document(doc_id).set(m)
+
+
 def _auto_snapshot():
     """Scheduler: cria snapshots para todos os jogadores às 7h."""
     if not db:
@@ -147,19 +160,74 @@ def get_ranking(period='all'):
         days = 7 if period == 'weekly' else 30
         cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
 
-        player_best = {}
-        for doc in db.collection('snapshots').stream():
-            s = doc.to_dict()
-            if s.get('snapshot_date', '') >= cutoff:
-                name = s.get('player_name', '')
-                if not name:
-                    continue
-                score = float(s.get('score', 0))
-                if name not in player_best or score > float(player_best[name].get('score', 0)):
-                    player_best[name] = s
+        # Agrega stats das partidas reais do período
+        all_players = {doc.id: _clean(doc.to_dict()) for doc in db.collection('players').stream()}
+        player_agg = {}
 
-        ranking = sorted(player_best.values(), key=lambda p: float(p.get('score', 0)), reverse=True)
+        for doc in db.collection('matches').stream():
+            m = doc.to_dict()
+            match_date = m.get('date', '')
+            if not match_date or match_date < cutoff:
+                continue
+            pname = m.get('player_name', '')
+            if not pname:
+                continue
+            if pname not in player_agg:
+                player_agg[pname] = {'matches': 0, 'wins': 0, 'total_rating': 0.0, 'maps': []}
+            player_agg[pname]['matches'] += 1
+            if m.get('win'):
+                player_agg[pname]['wins'] += 1
+            player_agg[pname]['total_rating'] += float(m.get('rating', 0))
+            if m.get('map'):
+                player_agg[pname]['maps'].append(m['map'])
+
+        if not player_agg:
+            # Fallback para snapshots se não houver partidas com data
+            for doc in db.collection('snapshots').stream():
+                s = doc.to_dict()
+                if s.get('snapshot_date', '') >= cutoff:
+                    pname = s.get('player_name', '')
+                    if not pname:
+                        continue
+                    if pname not in player_agg:
+                        player_agg[pname] = {'matches': 0, 'wins': 0, 'total_rating': float(s.get('score', 0)), 'maps': []}
+
+        ranking = []
+        for pname, agg in player_agg.items():
+            base = all_players.get(pname, {'name': pname})
+            n = agg['matches'] or 1
+            entry = {
+                **base,
+                'period_matches': agg['matches'],
+                'period_wins':    agg['wins'],
+                'win_rate':       round(agg['wins'] / n * 100, 1),
+                'avg_rating':     round(agg['total_rating'] / n, 2),
+                'top_map':        max(set(agg['maps']), key=agg['maps'].count) if agg['maps'] else '',
+            }
+            ranking.append(entry)
+
+        ranking.sort(key=lambda p: (p['period_matches'], p.get('avg_rating', 0)), reverse=True)
         return jsonify({'success': True, 'data': ranking, 'period': period, 'days': days})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/stats/map-week', methods=['GET'])
+def map_of_week():
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
+    try:
+        cutoff = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+        map_counts = {}
+        for doc in db.collection('matches').stream():
+            m = doc.to_dict()
+            if m.get('date', '') >= cutoff and m.get('map'):
+                map_name = m['map']
+                map_counts[map_name] = map_counts.get(map_name, 0) + 1
+        if not map_counts:
+            return jsonify({'success': True, 'map': None, 'count': 0, 'all': {}})
+        top = max(map_counts, key=map_counts.get)
+        return jsonify({'success': True, 'map': top, 'count': map_counts[top], 'all': map_counts})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -311,21 +379,25 @@ def gc_import_player():
 
         gc_data   = import_player(raw)
         name      = gc_data.get('name', f"Player_{gc_data.get('gc_player_id', 'unknown')}")
+
+        # Extrai e separa as partidas antes de salvar o jogador
+        last_matches = gc_data.pop('last_matches', [])
+
         star_info = calculate_player_stars(gc_data)
         gc_data.update(star_info)
         gc_data['updated_at'] = _now()
         gc_data['source']     = 'gamersclub'
-
-        avatar = raw.get('avatar', '')
-        if avatar:
-            gc_data['avatar'] = avatar
 
         if not db:
             return jsonify({'success': False, 'error': 'Firebase não conectado — verifique FIREBASE_KEY_B64 no Render'}), 500
 
         db.collection('players').document(name).set(gc_data)
         _save_snapshot(gc_data)
-        return jsonify({'success': True, 'player': name})
+
+        # Salva partidas individuais para ranking semanal/mensal
+        _save_matches(name, last_matches)
+
+        return jsonify({'success': True, 'player': name, 'matches_saved': len(last_matches)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

@@ -1,5 +1,6 @@
 import os
 import requests
+from datetime import datetime
 
 GC_BASE = "https://gamersclub.com.br"
 GAMERSCLUB_SESSION = os.getenv("GAMERSCLUB_SESSION", "")
@@ -62,31 +63,45 @@ def get_player(player_id):
     return _parse_player(resp.json(), player_id)
 
 
+def _normalize_date(val):
+    """Converte timestamp Unix ou string ISO para YYYY-MM-DD."""
+    if not val:
+        return ""
+    if isinstance(val, (int, float)):
+        try:
+            return datetime.utcfromtimestamp(val).strftime('%Y-%m-%d')
+        except Exception:
+            return ""
+    if isinstance(val, str):
+        return val[:10]
+    return ""
+
+
 def _parse_player(data, player_id):
     info = data.get("playerInfo", {})
+    character = data.get("character", {})
+
+    # Try to find avatar from multiple possible locations in the API response
+    avatar = (
+        info.get("photoUrl") or info.get("avatar") or info.get("photo") or
+        info.get("profilePicture") or info.get("picture") or
+        character.get("avatar") or character.get("photoUrl") or
+        character.get("image") or character.get("url") or
+        data.get("avatar") or ""
+    )
 
     result = {
         "gc_player_id": str(player_id),
         "name":         info.get("nick", f"Player_{player_id}"),
         "gc_level":     info.get("level", 0),
         "gc_rating":    info.get("rating", 0),
-        # Defaults para campos do ranking
-        "K":    0,
-        "D":    0,
-        "A":    0,
-        "ADR":  70.0,
-        "KDR":  1.0,
-        "KAST": 65.0,
-        "FK":   0,
-        "MK":   0,
-        "FA":   0,
-        "RP":   0,
-        "DROP": 0,
-        "S":    0,
-        "HS":   0.0,
+        "avatar":       avatar,
+        "K":    0, "D": 0, "A": 0,
+        "ADR":  70.0, "KDR": 1.0, "KAST": 65.0,
+        "FK":   0, "MK": 0, "FA": 0,
+        "RP":   0, "DROP": 0, "S": 0, "HS": 0.0,
     }
 
-    # Preenche stats do GamersClub
     for stat in data.get("stats", []):
         field = _STAT_MAP.get(stat.get("stat", ""))
         if field:
@@ -94,6 +109,40 @@ def _parse_player(data, player_id):
 
     result["DIFF"] = result["K"] - result["D"]
 
+    # Parse lastMatches with dates
+    raw_matches = data.get("lastMatches", [])
+    if raw_matches:
+        result["last_matches"] = _parse_matches(raw_matches, player_id)
+
+    return result
+
+
+def _parse_matches(matches, player_id):
+    """Extrai partidas recentes com data, mapa e performance."""
+    result = []
+    for m in matches:
+        date_val = (
+            m.get("date") or m.get("createdAt") or m.get("created_at") or
+            m.get("datetime") or m.get("matchDate") or m.get("startTime") or
+            m.get("timestamp") or ""
+        )
+        map_name = (
+            m.get("map") or m.get("mapName") or m.get("mapSlug") or
+            m.get("mapId") or ""
+        )
+        result.append({
+            "match_id":   str(m.get("id", "")),
+            "player_id":  str(player_id),
+            "map":        map_name,
+            "date":       _normalize_date(date_val),
+            "date_raw":   str(date_val),
+            "win":        bool(m.get("win")),
+            "rating":     _safe_float(m.get("ratingPlayer") or 0),
+            "rating_diff": _safe_float(m.get("ratingDiff") or 0),
+            "type":       m.get("type") or "",
+            "score_a":    m.get("scoreA"),
+            "score_b":    m.get("scoreB"),
+        })
     return result
 
 
@@ -131,10 +180,17 @@ def get_player_matches(player_id):
 def import_player(raw_data):
     """
     Processa dados brutos já buscados pelo browser (bookmarklet).
-    raw_data: response JSON de /api/box/init/{id}
+    raw_data: response JSON de /api/box/init/{id} + campos extras do bookmarklet
     """
     player_id = raw_data.get("playerInfo", {}).get("id", "unknown")
-    return _parse_player(raw_data, player_id)
+    result = _parse_player(raw_data, player_id)
+
+    # Avatar capturado pelo bookmarklet via DOM tem prioridade sobre o da API
+    bm_avatar = raw_data.get("avatar", "")
+    if bm_avatar:
+        result["avatar"] = bm_avatar
+
+    return result
 
 
 def get_team(team_id):

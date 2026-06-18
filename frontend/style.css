@@ -100,8 +100,12 @@ input { font-family: inherit; }
 }
 
 /* Logo */
-.logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.logo-emoji { font-size: 1.7rem; line-height: 1; }
+.logo { display: flex; align-items: center; flex-shrink: 0; }
+.logo-svg { height: 30px; width: auto; display: block; }
+.logo-svg .logo-mark { fill: var(--c-orange); }
+.logo-svg .logo-text { fill: var(--text); }
+.logo-svg .logo-hub  { fill: var(--c-orange); }
+
 .logo-label {
   font-size: 1.15rem; font-weight: 700;
   background: linear-gradient(135deg, var(--c-orange), var(--c-amber));
@@ -458,9 +462,18 @@ input { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
 }
 
+/* ─── MAP BADGE ──────────────────────────── */
+.map-badge {
+  margin-left: auto; padding: 7px 16px; border-radius: 20px;
+  background: rgba(255,183,0,.1); border: 1px solid rgba(255,183,0,.3);
+  color: var(--c-yellow); font-size: .82rem; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.map-badge strong { color: var(--text); }
+
 /* ─── PERIOD TABS (Ranking) ──────────────── */
 .period-tabs {
-  display: flex; gap: 8px; margin-bottom: 16px;
+  display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap;
 }
 .period-tab {
   padding: 8px 20px; border-radius: 10px;
