@@ -510,18 +510,18 @@ function initBookmarklet() {
           msg += '\\n\\uD83D\\uDCC5 Meses: ' + localCount + ' (' + localMonths.slice(0,3).join(', ') + ')';
           if (monthData) {
             var mm = monthData.monthMatches;
-            if (mm) {
+            if (mm !== undefined && mm !== null) {
               if (Array.isArray(mm)) {
                 msg += '\\n\\uD83D\\uDCCA monthMatches LISTA[' + mm.length + ']';
-                msg += '\\n[0]: ' + JSON.stringify(mm[0]).substring(0, 350);
+                msg += '\\n[0]: ' + (JSON.stringify(mm[0]) || 'vazio').substring(0, 350);
               } else if (typeof mm === 'object') {
                 var mmkeys = Object.keys(mm);
                 msg += '\\n\\uD83D\\uDCCA monthMatches DICT keys(' + mmkeys.length + '): ' + mmkeys.slice(0,10).join(', ');
                 if (mmkeys.length > 0) {
-                  msg += '\\n["' + mmkeys[0] + '"]: ' + JSON.stringify(mm[mmkeys[0]]).substring(0, 300);
+                  msg += '\\n["' + mmkeys[0] + '"]: ' + (JSON.stringify(mm[mmkeys[0]]) || 'vazio').substring(0, 300);
                 }
               } else {
-                msg += '\\nmonthMatches: ' + JSON.stringify(mm).substring(0, 200);
+                msg += '\\nmonthMatches: ' + (JSON.stringify(mm) || String(mm)).substring(0, 200);
               }
             } else {
               msg += '\\n?month= sem monthMatches, keys: ' + Object.keys(monthData).join(',');
