@@ -158,7 +158,9 @@ async function renderRanking(period = 'all') {
       <li class="rank-item">
         <span class="rank-pos">${medal(i + 1)}</span>
         <div class="rank-avatar">
-          ${p.avatar ? `<img src="${p.avatar}" alt="${p.name}" onerror="this.style.display='none'">` : ''}
+          ${p.avatar
+            ? `<img src="${p.avatar}" alt="${p.name}" onerror="this.outerHTML='<span>${(p.name||'?')[0].toUpperCase()}</span>'">`
+            : `<span>${(p.name||'?')[0].toUpperCase()}</span>`}
         </div>
         <div class="rank-info">
           <div class="rank-name">${p.name} ${stars(p.stars)}</div>
