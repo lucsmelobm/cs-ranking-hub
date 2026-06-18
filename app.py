@@ -78,6 +78,7 @@ def _save_snapshot(player_data):
     db.collection('snapshots').document(doc_id).set(snap)
 
 
+
 def _save_matches(player_name, matches):
     """Salva partidas individuais no Firestore (upsert por match_id + player)."""
     if not db or not matches:
