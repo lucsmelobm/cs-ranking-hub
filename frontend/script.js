@@ -21,21 +21,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ─── NAVIGATION ──────────────────────────── */
-function initNav() {
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      const page = document.getElementById(btn.dataset.tab);
-      if (page) page.classList.add('active');
+function navigateTo(tab) {
+  document.querySelectorAll('.nav-btn, .bnav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById(tab);
+  if (page) page.classList.add('active');
 
-      const tab = btn.dataset.tab;
-      if (tab === 'ranking') { initRankingTabs(); renderRanking('all'); }
-      if (tab === 'players') renderPlayers(players);
-      if (tab === 'teams')   renderPickGrid();
-      if (tab === 'sync')    requireAuth(renderSync);
-    });
+  if (tab === 'ranking') { initRankingTabs(); renderRanking('all'); }
+  if (tab === 'players') renderPlayers(players);
+  if (tab === 'teams')   renderPickGrid();
+  if (tab === 'sync')    requireAuth(renderSync);
+}
+
+function initNav() {
+  document.querySelectorAll('.nav-btn, .bnav-btn').forEach(btn => {
+    btn.addEventListener('click', () => navigateTo(btn.dataset.tab));
   });
 }
 
