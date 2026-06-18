@@ -45,6 +45,10 @@
           <i class="fas fa-dice"></i>
           <span>Times</span>
         </button>
+        <button class="nav-btn" data-tab="sync">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <span>Adicionar</span>
+        </button>
       </nav>
 
     </div>
@@ -194,6 +198,40 @@
           </div>
           <ul id="players-b" class="team-player-list"></ul>
         </div>
+      </div>
+    </section>
+
+    <!-- ========== SYNC / ADICIONAR ========== -->
+    <section class="tab-page" id="sync">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Adicionar Jogador</h1>
+          <p class="page-sub">Sincronize stats do GamersClub com um clique</p>
+        </div>
+      </div>
+
+      <div class="glass-card" style="max-width:640px">
+        <div class="card-hdr"><span>🔖 Bookmarklet de Sync</span></div>
+        <p style="color:var(--muted);font-size:.9rem;margin-bottom:20px;line-height:1.7">
+          Arraste o botão abaixo para a sua <strong style="color:var(--text)">barra de favoritos</strong>.
+          Depois, abra o perfil de qualquer jogador no GamersClub e clique no favorito — os dados serão sincronizados automaticamente.
+        </p>
+
+        <div style="display:flex;justify-content:center;margin-bottom:28px">
+          <a id="bookmarklet-link" class="btn-bookmarklet" title="Arraste para a barra de favoritos">
+            <i class="fas fa-sync-alt"></i> Sync GamersClub → Ranking
+          </a>
+        </div>
+
+        <hr style="border-color:var(--border);margin-bottom:24px">
+
+        <p style="color:var(--muted);font-size:.875rem;margin-bottom:16px;font-weight:600">Como usar:</p>
+        <ol class="sync-steps">
+          <li><span class="step-n">1</span> Arraste o botão acima para a barra de favoritos do seu navegador</li>
+          <li><span class="step-n">2</span> Abra o perfil do jogador em <strong style="color:var(--text)">gamersclub.com.br/player/ID</strong></li>
+          <li><span class="step-n">3</span> Clique no favorito <em>"Sync GamersClub → Ranking"</em></li>
+          <li><span class="step-n">4</span> Aguarde a confirmação e volte ao ranking</li>
+        </ol>
       </div>
     </section>
 

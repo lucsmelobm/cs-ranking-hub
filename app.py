@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, 'backend')
 from utils.star_calculator import calculate_player_stars
 from utils.team_balancer import balance_teams
-from utils.gamersclub_scraper import get_player, get_team, get_player_matches
+from utils.gamersclub_scraper import get_player, get_team, get_player_matches, import_player
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 app.secret_key = 'cs-ranking-hub-secret-key-2024'
@@ -180,6 +180,33 @@ def gc_sync_team():
                 results.append({'player': p['gc_player_id'], 'status': 'error', 'error': str(pe)})
 
         return jsonify({'success': True, 'synced': len(results), 'results': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/gamersclub/import', methods=['POST'])
+def gc_import_player():
+    """
+    Recebe dados brutos do GamersClub vindos do bookmarklet (browser do usuário)
+    e salva no Firestore. Resolve o bloqueio de IP do servidor.
+    Body: response JSON de gamersclub.com.br/api/box/init/{id}
+    """
+    try:
+        raw  = request.get_json()
+        if not raw or 'playerInfo' not in raw:
+            return jsonify({'success': False, 'error': 'Dados inválidos — envie o JSON de /api/box/init/{id}'}), 400
+
+        gc_data   = import_player(raw)
+        name      = gc_data.get('name', f"Player_{gc_data.get('gc_player_id', 'unknown')}")
+        star_info = calculate_player_stars(gc_data)
+        gc_data.update(star_info)
+        gc_data['updated_at'] = datetime.now()
+        gc_data['source']     = 'gamersclub'
+
+        if db:
+            db.collection('players').document(name).set(gc_data)
+
+        return jsonify({'success': True, 'player': name, 'data': gc_data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

@@ -392,6 +392,37 @@ input { font-family: inherit; }
 .tp-name { font-weight: 600; }
 .tp-adr { color: var(--muted); font-size: .8rem; }
 
+/* ─── SYNC PAGE ──────────────────────────── */
+.btn-bookmarklet {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 14px 28px; border-radius: 12px;
+  background: linear-gradient(135deg, var(--c-cyan), var(--c-purple));
+  color: #fff; font-size: 1rem; font-weight: 700;
+  text-decoration: none; cursor: grab;
+  box-shadow: 0 0 28px rgba(0,212,255,.3);
+  transition: transform .2s, box-shadow .2s;
+  user-select: none;
+}
+.btn-bookmarklet:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 40px rgba(0,212,255,.45);
+}
+.sync-steps {
+  display: flex; flex-direction: column; gap: 12px;
+  list-style: none; padding: 0;
+}
+.sync-steps li {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: .875rem; color: var(--muted); line-height: 1.5;
+}
+.step-n {
+  flex-shrink: 0;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0,212,255,.15); color: var(--c-cyan);
+  font-size: .75rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
 /* ─── EMPTY / UTILITY ────────────────────── */
 .empty-msg {
   padding: 32px; text-align: center; color: var(--muted);

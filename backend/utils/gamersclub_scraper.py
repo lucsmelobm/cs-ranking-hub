@@ -128,5 +128,14 @@ def get_player_matches(player_id):
     ]
 
 
+def import_player(raw_data):
+    """
+    Processa dados brutos já buscados pelo browser (bookmarklet).
+    raw_data: response JSON de /api/box/init/{id}
+    """
+    player_id = raw_data.get("playerInfo", {}).get("id", "unknown")
+    return _parse_player(raw_data, player_id)
+
+
 def get_team(team_id):
     raise NotImplementedError("Sync por time ainda não disponível — use sync-player por jogador.")

@@ -10,6 +10,7 @@ let picked  = [];
 /* ─── INIT ────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
   initNav();
+  initBookmarklet();
   await fetchPlayers();
   renderDashboard();
   document.getElementById('syncBtn').addEventListener('click', syncNow);
@@ -31,6 +32,7 @@ function initNav() {
       if (tab === 'ranking') renderRanking();
       if (tab === 'players') renderPlayers(players);
       if (tab === 'teams')   renderPickGrid();
+      if (tab === 'sync')    renderSync();
     });
   });
 }
@@ -242,6 +244,39 @@ function showTeams(data) {
 
   qs('#teams-result').style.display = 'grid';
   qs('#teams-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* ─── BOOKMARKLET ─────────────────────────── */
+function initBookmarklet() {
+  const backendUrl = API.replace('/api', '');
+  const code = `(function(){
+    var id = window.location.pathname.split('/').filter(Boolean).pop();
+    if (!window.location.href.includes('gamersclub.com.br/player/')) {
+      return alert('Abra o perfil de um jogador no GamersClub primeiro!');
+    }
+    fetch('/api/box/init/' + id)
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        return fetch('${backendUrl}/api/gamersclub/import', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data)
+        });
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        if (r.success) alert('✅ ' + r.player + ' sincronizado no ranking!');
+        else alert('❌ Erro: ' + r.error);
+      })
+      .catch(function(e){ alert('❌ Erro: ' + e.message); });
+  })();`;
+
+  const link = document.getElementById('bookmarklet-link');
+  if (link) link.href = 'javascript:' + encodeURIComponent(code);
+}
+
+function renderSync() {
+  initBookmarklet();
 }
 
 /* ─── TOAST ───────────────────────────────── */
