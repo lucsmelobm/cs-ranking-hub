@@ -20,6 +20,19 @@
   <!-- Toast notification -->
   <div id="toast" class="toast"></div>
 
+  <!-- Delete confirmation modal -->
+  <div id="delete-overlay" class="auth-overlay" style="display:none">
+    <div class="auth-modal glass-card">
+      <div class="auth-icon">⚠️</div>
+      <h2 class="auth-title">Remover Jogador</h2>
+      <p class="auth-sub" id="delete-msg">Você tem certeza que deseja remover esse jogador?</p>
+      <div style="display:flex;gap:12px;margin-top:24px">
+        <button id="delete-no-btn" class="btn-cancel">Não</button>
+        <button id="delete-yes-btn" class="btn-danger">Sim, remover</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Password modal -->
   <div id="auth-overlay" class="auth-overlay" style="display:none">
     <div class="auth-modal glass-card">
@@ -148,6 +161,12 @@
           <h1 class="page-title">Ranking</h1>
           <p class="page-sub">Classificação geral de performance</p>
         </div>
+      </div>
+
+      <div class="period-tabs">
+        <button class="period-tab active" data-period="all">🏆 Geral</button>
+        <button class="period-tab" data-period="weekly">📅 Semanal</button>
+        <button class="period-tab" data-period="monthly">📆 Mensal</button>
       </div>
 
       <div class="glass-card">

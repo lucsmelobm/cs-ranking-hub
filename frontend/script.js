@@ -6,11 +6,13 @@ const API = window.location.hostname === 'localhost' || window.location.hostname
 /* ─── STATE ───────────────────────────────── */
 let players = [];
 let picked  = [];
+let _deleteTarget = null;
 
 /* ─── INIT ────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
   initNav();
   initBookmarklet();
+  initDeleteModal();
   await fetchPlayers();
   renderDashboard();
   document.getElementById('syncBtn').addEventListener('click', syncNow);
@@ -29,7 +31,7 @@ function initNav() {
       if (page) page.classList.add('active');
 
       const tab = btn.dataset.tab;
-      if (tab === 'ranking') renderRanking();
+      if (tab === 'ranking') { initRankingTabs(); renderRanking('all'); }
       if (tab === 'players') renderPlayers(players);
       if (tab === 'teams')   renderPickGrid();
       if (tab === 'sync')    requireAuth(renderSync);
@@ -67,20 +69,18 @@ function renderDashboard() {
   const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
   const best   = ranked[0];
 
-  /* Stats */
   qs('#s-total').textContent = players.length || '--';
   qs('#s-best').textContent  = best ? first(best.name) : '--';
   qs('#s-kdr').textContent   = players.length ? avg(players, 'KDR').toFixed(2) : '--';
   qs('#s-adr').textContent   = players.length ? avg(players, 'ADR').toFixed(0) : '--';
 
-  /* Best Player */
   const bp = qs('#best-player-body');
   if (!best) {
     bp.innerHTML = '<div class="empty-msg">Nenhum jogador cadastrado ainda</div>';
   } else {
     bp.innerHTML = `
       <div class="bp-avatar">
-        ${best.avatar ? `<img src="${best.avatar}" alt="${best.name}">` : '🎮'}
+        ${best.avatar ? `<img src="${best.avatar}" alt="${best.name}" onerror="this.parentElement.innerHTML='🎮'">` : '🎮'}
       </div>
       <div class="bp-name">${best.name}</div>
       <div class="bp-stars">${stars(best.stars)}</div>
@@ -92,7 +92,6 @@ function renderDashboard() {
       </div>`;
   }
 
-  /* Top list */
   if (!ranked.length) {
     qs('#top-list').innerHTML = '<li class="empty-msg">Nenhum jogador cadastrado ainda</li>';
   } else {
@@ -109,31 +108,62 @@ function renderDashboard() {
 }
 
 /* ─── RANKING ─────────────────────────────── */
-function renderRanking() {
-  if (!players.length) {
-    qs('#ranking-list').innerHTML = '<li class="empty-msg">Nenhum jogador cadastrado ainda</li>';
-    return;
-  }
-  const ranked = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
-  qs('#ranking-list').innerHTML = ranked.map((p, i) => `
-    <li class="rank-item">
-      <span class="rank-pos">${medal(i + 1)}</span>
-      <div class="rank-info">
-        <div class="rank-name">${p.name} ${stars(p.stars)}</div>
-        <div class="rank-meta">
-          <span>KDR ${fmt(p.KDR, 2)}</span>
-          <span>ADR ${fmt(p.ADR)}</span>
-          <span>KAST ${fmt(p.KAST, 0)}%</span>
-          <span>K ${p.K ?? 0}</span>
-          <span>D ${p.D ?? 0}</span>
+function initRankingTabs() {
+  document.querySelectorAll('.period-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      renderRanking(tab.dataset.period);
+    };
+  });
+}
+
+async function renderRanking(period = 'all') {
+  const list = qs('#ranking-list');
+  list.innerHTML = '<li class="empty-msg">Carregando...</li>';
+
+  try {
+    let data;
+    if (period === 'all') {
+      data = [...players].sort((a, b) => (b.score || 0) - (a.score || 0));
+    } else {
+      const res  = await fetch(`${API}/ranking/${period}`);
+      const json = await res.json();
+      data = json.success ? json.data : [];
+    }
+
+    if (!data.length) {
+      list.innerHTML = '<li class="empty-msg">Nenhum dado para este período. Sincronize jogadores primeiro.</li>';
+      return;
+    }
+
+    list.innerHTML = data.map((p, i) => `
+      <li class="rank-item">
+        <span class="rank-pos">${medal(i + 1)}</span>
+        <div class="rank-avatar">
+          ${p.avatar ? `<img src="${p.avatar}" alt="${p.name}" onerror="this.style.display='none'">` : ''}
         </div>
-      </div>
-      <span class="rank-score">${fmt(p.score)}</span>
-    </li>`).join('');
+        <div class="rank-info">
+          <div class="rank-name">${p.name} ${stars(p.stars)}</div>
+          <div class="rank-meta">
+            <span>KDR ${fmt(p.KDR, 2)}</span>
+            <span>ADR ${fmt(p.ADR)}</span>
+            <span>KAST ${fmt(p.KAST, 0)}%</span>
+            <span>K ${p.K ?? 0}</span>
+            <span>D ${p.D ?? 0}</span>
+          </div>
+        </div>
+        <span class="rank-score">${fmt(p.score)}</span>
+      </li>`).join('');
+  } catch {
+    list.innerHTML = '<li class="empty-msg">Erro ao carregar ranking</li>';
+  }
 }
 
 /* ─── PLAYERS GRID ────────────────────────── */
 function renderPlayers(list) {
+  const isAdmin = sessionStorage.getItem('avance_auth') === '1';
+
   if (!players.length) {
     qs('#players-grid').innerHTML = '<div class="empty-msg">Nenhum jogador cadastrado ainda</div>';
     return;
@@ -142,7 +172,9 @@ function renderPlayers(list) {
     ? list.map(p => `
         <div class="player-card">
           <div class="pc-avatar">
-            ${p.avatar ? `<img src="${p.avatar}" alt="${p.name}">` : '🎮'}
+            ${p.avatar
+              ? `<img src="${p.avatar}" alt="${p.name}" onerror="this.parentElement.innerHTML='🎮'">`
+              : '🎮'}
           </div>
           <div class="pc-name">${p.name}</div>
           <div class="pc-stars">${stars(p.stars)}</div>
@@ -155,6 +187,7 @@ function renderPlayers(list) {
             ${stat('Deaths', p.D ?? 0)}
             ${stat('Assists', p.A ?? 0)}
           </div>
+          ${isAdmin ? `<button class="btn-delete" onclick="confirmDelete('${escJs(p.name)}')">🗑️ Remover</button>` : ''}
         </div>`).join('')
     : '<div class="empty-msg">Nenhum jogador encontrado</div>';
 }
@@ -162,6 +195,59 @@ function renderPlayers(list) {
 function filterPlayers(q) {
   const filtered = players.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
   renderPlayers(filtered);
+}
+
+/* ─── DELETE ──────────────────────────────── */
+function confirmDelete(name) {
+  _deleteTarget = name;
+  qs('#delete-msg').textContent = `Você tem certeza que deseja remover "${name}"?`;
+  qs('#delete-overlay').style.display = 'flex';
+}
+
+function initDeleteModal() {
+  qs('#delete-no-btn').onclick = () => {
+    qs('#delete-overlay').style.display = 'none';
+    _deleteTarget = null;
+  };
+
+  qs('#delete-yes-btn').onclick = async () => {
+    if (!_deleteTarget) return;
+    const btn = qs('#delete-yes-btn');
+    btn.disabled = true;
+    btn.textContent = 'Removendo...';
+
+    try {
+      const res  = await fetch(`${API}/player/${encodeURIComponent(_deleteTarget)}`, {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ password: sessionStorage.getItem('avance_pwd') })
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        players = players.filter(p => p.name !== _deleteTarget);
+        qs('#delete-overlay').style.display = 'none';
+        renderPlayers(players);
+        renderDashboard();
+        toast(`✅ ${_deleteTarget} removido!`);
+      } else {
+        toast('❌ ' + (json.error || 'Erro ao remover'), 'error');
+      }
+    } catch {
+      toast('❌ Erro de conexão', 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Sim, remover';
+    _deleteTarget = null;
+  };
+
+  qs('#delete-overlay').onclick = e => {
+    if (e.target === qs('#delete-overlay')) {
+      qs('#delete-overlay').style.display = 'none';
+      _deleteTarget = null;
+    }
+  };
 }
 
 /* ─── TEAM BUILDER ────────────────────────── */
@@ -215,7 +301,6 @@ async function generateTeams() {
     if (json.success) return showTeams(json.data);
   } catch { /* fallback below */ }
 
-  /* local fallback */
   const sorted = [...picked].sort((a, b) => (b.stars || 1) - (a.stars || 1));
   const t1 = [], t2 = [];
   sorted.forEach((p, i) => (i % 2 === 0 ? t1 : t2).push(p));
@@ -250,10 +335,10 @@ function showTeams(data) {
 function requireAuth(onSuccess) {
   if (sessionStorage.getItem('avance_auth') === '1') { onSuccess(); return; }
 
-  const overlay = document.getElementById('auth-overlay');
-  const input   = document.getElementById('auth-input');
-  const btn     = document.getElementById('auth-btn');
-  const err     = document.getElementById('auth-error');
+  const overlay = qs('#auth-overlay');
+  const input   = qs('#auth-input');
+  const btn     = qs('#auth-btn');
+  const err     = qs('#auth-error');
 
   overlay.style.display = 'flex';
   input.value = '';
@@ -273,6 +358,7 @@ function requireAuth(onSuccess) {
       const json = await res.json();
       if (json.success) {
         sessionStorage.setItem('avance_auth', '1');
+        sessionStorage.setItem('avance_pwd', pwd);
         overlay.style.display = 'none';
         onSuccess();
       } else {
@@ -296,26 +382,37 @@ function requireAuth(onSuccess) {
 function initBookmarklet() {
   const backendUrl = API.replace('/api', '');
   const code = `(function(){
-    var id = window.location.pathname.split('/').filter(Boolean).pop();
-    if (!window.location.href.includes('gamersclub.com.br/player/')) {
-      return alert('Abra o perfil de um jogador no GamersClub primeiro!');
+  var url = window.location.href;
+  if (!url.includes('gamersclub.com.br/player/')) {
+    return alert('Abra o perfil de um jogador no GamersClub primeiro!');
+  }
+  var id = url.split('/player/')[1].split('/')[0].split('?')[0];
+  var avatar = '';
+  var imgs = document.querySelectorAll('img');
+  for (var i = 0; i < imgs.length; i++) {
+    var src = imgs[i].src || '';
+    if (src && (src.includes('steamcdn') || src.includes('akamaihd') || src.includes('steamstatic') || src.includes('avatars.steam'))) {
+      avatar = src;
+      break;
     }
-    fetch('/api/box/init/' + id)
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        return fetch('${backendUrl}/api/gamersclub/import', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(data)
-        });
-      })
-      .then(function(r){ return r.json(); })
-      .then(function(r){
-        if (r.success) alert('✅ ' + r.player + ' sincronizado no ranking!');
-        else alert('❌ Erro: ' + r.error);
-      })
-      .catch(function(e){ alert('❌ Erro: ' + e.message); });
-  })();`;
+  }
+  fetch('/api/box/init/' + id)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      data.avatar = avatar;
+      return fetch('${backendUrl}/api/gamersclub/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+      });
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (r.success) alert('\\u2705 ' + r.player + ' sincronizado no ranking!');
+      else alert('\\u274c Erro: ' + r.error);
+    })
+    .catch(function(e){ alert('\\u274c Erro: ' + e.message); });
+})();`;
 
   const link = document.getElementById('bookmarklet-link');
   if (link) link.href = 'javascript:' + encodeURIComponent(code);
@@ -342,4 +439,4 @@ const slug  = str => str.toLowerCase().replace(/\s+/g, '-');
 const stars = n => '⭐'.repeat(Math.max(1, Math.min(3, n || 1)));
 const stat  = (k, v) => `<div class="pc-stat"><span class="pc-stat-k">${k}</span><span class="pc-stat-v">${v}</span></div>`;
 const medal = i => i === 1 ? '🥇' : i === 2 ? '🥈' : i === 3 ? '🥉' : `#${i}`;
-
+const escJs = s => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");

@@ -2,10 +2,16 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import sys
 import os
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    _sched_ok = True
+except ImportError:
+    _sched_ok = False
 
 def _now():
     return datetime.now().isoformat()
@@ -48,6 +54,53 @@ except Exception as e:
     db = None
 
 
+# ============ SNAPSHOTS / SCHEDULER ============
+
+def _save_snapshot(player_data):
+    """Salva snapshot diário por jogador (1 doc por dia, upsert)."""
+    if not db:
+        return
+    name = player_data.get('name', 'unknown')
+    date = datetime.now().strftime('%Y-%m-%d')
+    doc_id = f"{name}_{date}".replace(' ', '_').replace('/', '-')
+    snap = {
+        'player_name': name,
+        'gc_player_id': str(player_data.get('gc_player_id', '')),
+        'score': float(player_data.get('score', 0)),
+        'stars': int(player_data.get('stars', 1)),
+        'KDR':  float(player_data.get('KDR', 0)),
+        'ADR':  float(player_data.get('ADR', 0)),
+        'KAST': float(player_data.get('KAST', 0)),
+        'avatar': player_data.get('avatar', ''),
+        'snapshot_date': date,
+        'created_at': _now(),
+    }
+    db.collection('snapshots').document(doc_id).set(snap)
+
+
+def _auto_snapshot():
+    """Scheduler: cria snapshots para todos os jogadores às 7h."""
+    if not db:
+        return
+    try:
+        players = [doc.to_dict() for doc in db.collection('players').stream()]
+        for p in players:
+            _save_snapshot(p)
+        print(f"[{_now()}] ✅ Snapshots criados: {len(players)} jogadores")
+    except Exception as e:
+        print(f"[{_now()}] ❌ Erro no snapshot: {e}")
+
+
+if _sched_ok:
+    try:
+        _scheduler = BackgroundScheduler(daemon=True)
+        _scheduler.add_job(func=_auto_snapshot, trigger='cron', hour=7, minute=0)
+        _scheduler.start()
+        print("✅ Scheduler 7h ativo")
+    except Exception as e:
+        print(f"Scheduler error: {e}")
+
+
 # ============ ROUTES ============
 
 @app.route('/')
@@ -81,13 +134,32 @@ def get_players():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/ranking', methods=['GET'])
-def get_ranking():
+@app.route('/api/ranking/<period>', methods=['GET'])
+def get_ranking(period='all'):
     if not db:
         return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
     try:
-        players = [_clean(doc.to_dict()) for doc in db.collection('players').stream()]
-        ranking = sorted(players, key=lambda p: p.get('score', 0), reverse=True)
-        return jsonify({'success': True, 'data': ranking})
+        if period == 'all':
+            players = [_clean(doc.to_dict()) for doc in db.collection('players').stream()]
+            ranking = sorted(players, key=lambda p: p.get('score', 0), reverse=True)
+            return jsonify({'success': True, 'data': ranking})
+
+        days = 7 if period == 'weekly' else 30
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+
+        player_best = {}
+        for doc in db.collection('snapshots').stream():
+            s = doc.to_dict()
+            if s.get('snapshot_date', '') >= cutoff:
+                name = s.get('player_name', '')
+                if not name:
+                    continue
+                score = float(s.get('score', 0))
+                if name not in player_best or score > float(player_best[name].get('score', 0)):
+                    player_best[name] = s
+
+        ranking = sorted(player_best.values(), key=lambda p: float(p.get('score', 0)), reverse=True)
+        return jsonify({'success': True, 'data': ranking, 'period': period, 'days': days})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -101,6 +173,20 @@ def get_best_player():
         return jsonify({'success': True, 'data': best[0] if best else None})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/player/<path:name>', methods=['DELETE'])
+def delete_player(name):
+    if not db:
+        return jsonify({'success': False, 'error': 'Firebase não conectado'}), 500
+    data = request.get_json() or {}
+    if not ADMIN_PASSWORD or data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 401
+    try:
+        db.collection('players').document(name).delete()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/player', methods=['POST'])
 def add_player():
@@ -230,10 +316,15 @@ def gc_import_player():
         gc_data['updated_at'] = _now()
         gc_data['source']     = 'gamersclub'
 
+        avatar = raw.get('avatar', '')
+        if avatar:
+            gc_data['avatar'] = avatar
+
         if not db:
             return jsonify({'success': False, 'error': 'Firebase não conectado — verifique FIREBASE_KEY_B64 no Render'}), 500
 
         db.collection('players').document(name).set(gc_data)
+        _save_snapshot(gc_data)
         return jsonify({'success': True, 'player': name})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
