@@ -414,48 +414,48 @@ function initBookmarklet() {
   function findAvatar(apiData) {
     var playerId = String((apiData && apiData.playerInfo && apiData.playerInfo.id) || '');
 
-    // 1. Nuxt store pelo ID do jogador — mais preciso, evita pegar foto de amigos
+    // 1. Nuxt store — busca por posição de string (robusto com objetos aninhados)
     try {
       var nd = JSON.stringify(window.__nuxt__ || window.__NUXT__ || {});
-      // Busca photoUrl imediatamente após o id do jogador no JSON
-      if (playerId) {
-        var pat1 = new RegExp('"id":' + playerId + '[^}]{0,400}"photoUrl":"([^"]+)"');
-        var pat2 = new RegExp('"photoUrl":"([^"]+)"[^}]{0,400}"id":' + playerId);
-        var m1 = nd.match(pat1) || nd.match(pat2);
-        if (m1 && m1[1]) return m1[1];
+      if (playerId && nd) {
+        var idToken = '"id":' + playerId;
+        var pos = nd.indexOf(idToken);
+        while (pos >= 0) {
+          // Janela de 2000 chars ao redor do ID do jogador
+          var seg = nd.substring(Math.max(0, pos - 300), pos + 2000);
+          var pm = seg.match(/"photoUrl":"([^"]+)"/);
+          if (pm && pm[1] && pm[1].startsWith('http')) return pm[1];
+          pos = nd.indexOf(idToken, pos + 1);
+        }
+        // Fallback: primeiro photoUrl Steam CDN no store inteiro
+        var allUrls = nd.match(/"photoUrl":"(https?:\/\/[^"]{20,})"/g);
+        if (allUrls && allUrls[0]) {
+          var first = allUrls[0].match(/"photoUrl":"([^"]+)"/);
+          if (first && first[1]) return first[1];
+        }
       }
     } catch(ex) {}
 
-    // 2. og:image — GamersClub seta com a foto do jogador atual
+    // 2. og:image — definido pelo servidor para o perfil atual
     var og = document.querySelector('meta[property="og:image"]');
     var ogVal = og && og.getAttribute('content');
-    if (ogVal && !ogVal.includes('/logo') && !ogVal.includes('default')) return ogVal;
+    if (ogVal && ogVal.startsWith('http') && !ogVal.includes('/logo') && !ogVal.includes('default')) return ogVal;
 
-    // 3. Campos diretos da resposta da API (playerInfo e character)
+    // 3. Campos diretos da API (playerInfo)
     var info = (apiData && apiData.playerInfo) || {};
-    var fromApi = info.photoUrl || info.avatar || info.photo || info.picture || '';
-    if (fromApi) return fromApi;
+    var fromApi = info.photoUrl || info.avatar || info.photo || info.picture || info.image || '';
+    if (fromApi && fromApi.startsWith('http')) return fromApi;
 
-    // 4. Header/perfil do DOM — procura só nos contêineres do perfil, não na lista de amigos
-    var cdn = ['steamcdn','akamaihd','steamstatic','avatars.steam','gamersclub.com.br/storage'];
-    var profileSelectors = [
-      '[class*="player-header"] img',
-      '[class*="profile-header"] img',
-      '[class*="playerHeader"] img',
-      '[class*="profileHeader"] img',
-      '[class*="player-card"] img',
-      '[class*="playerCard"] img',
-      'header img',
-      '.gc-player-info img',
-      'main > * > * img'
-    ];
-    for (var s = 0; s < profileSelectors.length; s++) {
-      var els = document.querySelectorAll(profileSelectors[s]);
-      for (var e = 0; e < els.length && e < 3; e++) {
-        var src = els[e].src || els[e].getAttribute('data-src') || els[e].getAttribute('lazy-src') || '';
-        for (var c = 0; c < cdn.length; c++) {
-          if (src && src.includes(cdn[c])) return src;
-        }
+    // 4. Primeira img grande (>=60px) que seja Steam CDN — avatar do próprio perfil
+    var cdn = ['steamcdn','akamaihd','steamstatic','avatars.steamstatic','steamcommunity'];
+    var imgs = document.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++) {
+      var el = imgs[i];
+      var rect = el.getBoundingClientRect();
+      if (rect.width < 48 || rect.height < 48) continue; // ignora thumbnails pequenos
+      var src = el.src || el.getAttribute('data-src') || el.getAttribute('lazy-src') || '';
+      for (var c = 0; c < cdn.length; c++) {
+        if (src && src.includes(cdn[c])) return src;
       }
     }
 
