@@ -148,20 +148,18 @@ def _parse_matches(matches, player_id):
 
 def parse_history_stats(history_data):
     """
-    Tenta extrair estatísticas mensais do Histórico.
-    Aceita diferentes formatos que o GamersClub pode retornar.
+    Extrai estatísticas mensais do endpoint /api/box/history/{id}.
+    Resposta confirmada: {months: [...], servers, stat, matches, character}
     """
     if not history_data or not isinstance(history_data, dict):
         return []
 
-    # Tenta encontrar a lista de períodos mensais em campos comuns
+    # Endpoint confirmado retorna chave "months"
     items = (
+        history_data.get("months") or
         history_data.get("stats") or
         history_data.get("history") or
         history_data.get("data") or
-        history_data.get("months") or
-        history_data.get("periods") or
-        history_data.get("monthly") or
         []
     )
 
@@ -171,7 +169,10 @@ def parse_history_stats(history_data):
     def get_any(d, *keys, default=0.0):
         for k in keys:
             if k in d and d[k] is not None:
-                return _safe_float(d[k])
+                try:
+                    return float(str(d[k]).replace(",", ".").replace("%", "").strip())
+                except (ValueError, TypeError):
+                    pass
         return default
 
     months = []
@@ -179,27 +180,30 @@ def parse_history_stats(history_data):
         if not isinstance(item, dict):
             continue
 
+        # Tenta vários nomes possíveis para o campo de período
         period = (
             item.get("period") or item.get("month") or item.get("date") or
             item.get("referenceMonth") or item.get("monthYear") or
-            item.get("competitionMonth") or ""
+            item.get("competitionMonth") or item.get("monthRef") or
+            item.get("name") or item.get("label") or ""
         )
 
         months.append({
             "period":        str(period),
-            "kills":         get_any(item, "kills", "k", "totalKills", "Kills"),
-            "deaths":        get_any(item, "deaths", "d", "totalDeaths", "Deaths"),
-            "assists":       get_any(item, "assists", "a", "totalAssists", "Assists"),
-            "kdr":           get_any(item, "kdr", "KDR", "killDeathRatio"),
-            "adr":           get_any(item, "adr", "ADR", "averageDamageRound", "damagePerRound"),
-            "kast":          get_any(item, "kast", "KAST", "kastPercent", "kast_percent"),
-            "multikills":    get_any(item, "multikills", "multiKills", "mk", "MK", "multiKill"),
-            "first_kills":   get_any(item, "firstKills", "firstKill", "fk", "FK", "first_kill"),
-            "hs":            get_any(item, "hs", "HS", "headshotPercent", "headshot"),
-            "bombs_planted": get_any(item, "bombsPlanted", "planted", "bombPlanted"),
-            "bombs_defused": get_any(item, "bombsDefused", "defused", "bombDefused"),
-            "matches":       get_any(item, "matches", "totalMatches", "games", "gamesPlayed"),
-            "wins":          get_any(item, "wins", "victories", "won"),
+            "_raw_keys":     list(item.keys()),
+            "kills":         get_any(item, "kills", "k", "totalKills", "Kills", "kill"),
+            "deaths":        get_any(item, "deaths", "d", "totalDeaths", "Deaths", "death"),
+            "assists":       get_any(item, "assists", "a", "totalAssists", "Assists", "assist"),
+            "kdr":           get_any(item, "kdr", "KDR", "killDeathRatio", "kd", "ratio"),
+            "adr":           get_any(item, "adr", "ADR", "averageDamageRound", "damagePerRound", "damage"),
+            "kast":          get_any(item, "kast", "KAST", "kastPercent", "kast_percent", "kastP"),
+            "multikills":    get_any(item, "multikills", "multiKills", "mk", "MK", "multiKill", "multi_kills"),
+            "first_kills":   get_any(item, "firstKills", "firstKill", "fk", "FK", "first_kill", "firstkill"),
+            "hs":            get_any(item, "hs", "HS", "headshotPercent", "headshot", "hsPercent", "hsP"),
+            "bombs_planted": get_any(item, "bombsPlanted", "planted", "bombPlanted", "plant", "bomb_planted"),
+            "bombs_defused": get_any(item, "bombsDefused", "defused", "bombDefused", "defuse", "bomb_defused"),
+            "matches":       get_any(item, "matches", "totalMatches", "games", "gamesPlayed", "match"),
+            "wins":          get_any(item, "wins", "victories", "won", "win"),
         })
 
     return months
@@ -249,21 +253,37 @@ def import_player(raw_data):
     if bm_avatar:
         result["avatar"] = bm_avatar
 
-    # Histórico mensal — capturado pelo bookmarklet via endpoints candidatos
-    history_raw  = raw_data.get("_history_data")
-    history_url  = raw_data.get("_history_url", "")
-    monthly = parse_history_stats(history_raw) if history_raw else []
+    # Histórico mensal via /api/box/history/{id}
+    history_raw = raw_data.get("_history_data") or {}
+    history_url = raw_data.get("_history_url", "/api/box/history/{id}")
+
+    # Tenta também extrair avatar do campo character da resposta de histórico
+    hist_char = history_raw.get("character", {}) if history_raw else {}
+    hist_avatar = (
+        hist_char.get("avatar") or hist_char.get("photoUrl") or
+        hist_char.get("image") or hist_char.get("url") or ""
+    )
+    if hist_avatar and not result.get("avatar"):
+        result["avatar"] = hist_avatar
+
+    monthly = parse_history_stats(history_raw)
     if monthly:
-        result["monthly_stats"]   = monthly
+        result["monthly_stats"]    = monthly
         result["history_endpoint"] = history_url
-        # Preenche os stats com o mês mais recente se disponível
+        # Usa o mês mais recente para o score/ranking
         latest = monthly[0]
-        if latest.get("kdr"):  result["KDR"]  = latest["kdr"]
-        if latest.get("adr"):  result["ADR"]  = latest["adr"]
-        if latest.get("kast"): result["KAST"] = latest["kast"]
-        if latest.get("kills"):  result["K"]  = int(latest["kills"])
-        if latest.get("deaths"): result["D"]  = int(latest["deaths"])
-        if latest.get("assists"):result["A"]  = int(latest["assists"])
+        if latest.get("kdr"):          result["KDR"]  = latest["kdr"]
+        if latest.get("adr"):          result["ADR"]  = latest["adr"]
+        if latest.get("kast"):         result["KAST"] = latest["kast"]
+        if latest.get("kills"):        result["K"]    = int(latest["kills"])
+        if latest.get("deaths"):       result["D"]    = int(latest["deaths"])
+        if latest.get("assists"):      result["A"]    = int(latest["assists"])
+        if latest.get("multikills"):   result["MK"]   = int(latest["multikills"])
+        if latest.get("first_kills"):  result["FK"]   = int(latest["first_kills"])
+        if latest.get("hs"):           result["HS"]   = latest["hs"]
+        if latest.get("bombs_planted"):result["bombs_planted"] = int(latest["bombs_planted"])
+        if latest.get("bombs_defused"):result["bombs_defused"] = int(latest["bombs_defused"])
+        result["DIFF"] = result["K"] - result["D"]
 
     return result
 

@@ -414,9 +414,17 @@ def gc_import_player():
         # Salva partidas individuais para ranking semanal/mensal
         _save_matches(name, last_matches)
 
+        monthly = gc_data.get('monthly_stats', [])
+        monthly_count = len(monthly)
         history_endpoint = gc_data.get('history_endpoint', '')
-        monthly_count = len(gc_data.get('monthly_stats', []))
-        print(f"[import] {name} | matches={len(last_matches)} | monthly={monthly_count} | hist_url={history_endpoint}")
+
+        # Retorna chaves do primeiro mês para debug do mapeamento
+        first_month_keys = None
+        if monthly:
+            first_month_keys = ','.join(monthly[0].get('_raw_keys', []))
+            # Mostra no log do Render
+            print(f"[import] {name} | monthly={monthly_count} | primeiro mês keys: {first_month_keys}")
+            print(f"[import] {name} | primeiro mês valores: {monthly[0]}")
 
         return jsonify({
             'success': True,
@@ -424,6 +432,7 @@ def gc_import_player():
             'matches_saved': len(last_matches),
             'monthly_periods': monthly_count,
             'history_endpoint': history_endpoint or None,
+            'first_month_keys': first_month_keys,
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

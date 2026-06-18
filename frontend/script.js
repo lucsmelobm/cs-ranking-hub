@@ -464,43 +464,17 @@ function initBookmarklet() {
     return '';
   }
 
-  // Endpoints candidatos para o Histórico mensal
-  var histEndpoints = [
-    '/api/box/history/' + id,
-    '/api/player/history/' + id,
-    '/api/box/playerHistory/' + id,
-    '/api/box/statsHistory/' + id,
-    '/api/player/' + id + '/history',
-    '/api/player/' + id + '/stats/history',
-  ];
-
-  function tryHistory() {
-    var attempts = histEndpoints.map(function(url) {
-      return fetch(url, {credentials: 'include'})
-        .then(function(r) { return r.ok ? r.json().then(function(d){ return {url:url, data:d}; }) : null; })
-        .catch(function() { return null; });
-    });
-    return Promise.all(attempts).then(function(results) {
-      for (var i = 0; i < results.length; i++) {
-        if (results[i] && results[i].data && Object.keys(results[i].data).length > 1) {
-          return results[i];
-        }
-      }
-      return null;
-    });
-  }
-
   Promise.all([
     fetch('/api/box/init/' + id).then(function(r){ return r.json(); }),
-    tryHistory()
+    fetch('/api/box/history/' + id, {credentials:'include'}).then(function(r){ return r.json(); }).catch(function(){ return null; })
   ])
     .then(function(results) {
       var data = results[0];
       var hist = results[1];
       data.avatar = findAvatar(data);
       if (hist) {
-        data._history_url  = hist.url;
-        data._history_data = hist.data;
+        data._history_url  = '/api/box/history/' + id;
+        data._history_data = hist;
       }
       return fetch('${backendUrl}/api/gamersclub/import', {
         method: 'POST',
@@ -512,8 +486,8 @@ function initBookmarklet() {
     .then(function(r){
       if (r.success) {
         var msg = '\\u2705 ' + r.player + ' sincronizado!';
-        if (r.history_endpoint) msg += '\\nHistórico: ' + r.history_endpoint;
-        else msg += '\\nHistórico: endpoint não encontrado (informe ao dev)';
+        if (r.monthly_periods) msg += '\\n\\uD83D\\uDCC5 ' + r.monthly_periods + ' meses de histórico salvos';
+        if (r.first_month_keys) msg += '\\nCampos: ' + r.first_month_keys;
         alert(msg);
       } else alert('\\u274c Erro: ' + r.error);
     })
